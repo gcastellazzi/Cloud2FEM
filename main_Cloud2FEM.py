@@ -244,23 +244,6 @@ def loadpcl():
         print('No Point Cloud selected')
 
 
-def make_slices(d):
-    """
-    Given zslices, pcl and the slice thickness d, generates
-    and stores the PCl sections in mtc.slices
-    """
-    mct.slices = None
-    # try:
-    mct.slices = {}
-    win.combo_slices.clear()
-    invmask = np.ones(mct.npts, dtype=bool)     # For 3D visualization purposes
-    for z in mct.zslices:
-        mask = np.logical_and(mct.pcl[:, 2] >= (z - float(d) / 2), mct.pcl[:, 2] <= (z + float(d) / 2))
-        invmask *= np.invert(mask)              # For 3D visualization purposes
-        mct.slices[z] = mct.pcl[mask, :]
-        win.combo_slices.addItem(str('%.3f' % z))  # Populates the gui slices combobox
-    mct.netpcl = mct.pcl[invmask, :]            # For 3D visualization purposes
-
 
 def find_centroids(minwthick):
     """
@@ -826,9 +809,14 @@ class Window(QMainWindow):
                     mct.zslices = cp.make_zcoords(a, b, c, 2)
                 else:
                     pass # Custom slicing to be implemented
+                    
+                mct.slices = None
+                mct.netpcl = None
+                mct.slices, mct.netpcl = cp.make_slices(mct.zslices, mct.pcl, float(d), mct.npts)
+                self.combo_slices.clear()
+                for z in mct.zslices:
+                    self.combo_slices.addItem(str('%.3f' % z))  # Populates the gui slices combobox
                 
-                
-                make_slices(d)
                 print(len(mct.slices.keys()), ' slices generated')
                 self.lineEdit_wall_thick.setEnabled(True)
                 self.btn_gen_centr.setEnabled(True)
