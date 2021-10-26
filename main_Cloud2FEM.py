@@ -927,7 +927,7 @@ def exp_mesh_func():
 class Window(QMainWindow):
     def __init__(self):
         super(Window, self).__init__()
-        loadUi("cloud2fem_gui.ui", self)
+        loadUi("gui_main.ui", self)
         self.setWindowTitle('Cloud2FEM')
         self.graphlayout.setBackground((255, 255, 255))
         self.plot2d = self.graphlayout.addPlot()
@@ -1540,7 +1540,7 @@ class Window(QMainWindow):
         self.main2dplot()
 
     def copy_polylines(self):
-        copydialog = loadUi("cloud2fem_gui_copypolylines_dialog.ui")
+        copydialog = loadUi("gui_copypolylines_dialog.ui")
         copydialog.setWindowTitle("Copy slice's polylines")
         copydialog.combo_copy_pl.clear()
 
