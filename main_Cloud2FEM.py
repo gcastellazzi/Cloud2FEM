@@ -12,6 +12,7 @@ from pyqtgraph import PlotWidget
 # import pyqtgraph.opengl as gl     # serve per il plot pyqtgraph 3D che non sto usando
 
 from Vispy3DViewer import Visp3dplot
+import Cloud2Polygons as cp
 
 
 import ezdxf
@@ -834,7 +835,16 @@ class Window(QMainWindow):
                 msg_slices.setIcon(QMessageBox.Warning)
                 x = msg_slices.exec_()
             else:
-                make_zslices(a, b, c)
+                mct.zslices = None
+                if self.rbtn_fixnum.isChecked():
+                    mct.zslices = cp.make_zcoords(a, b, c, 1)
+                elif self.rbtn_fixstep.isChecked():
+                    mct.zslices = cp.make_zcoords(a, b, c, 2)
+                else:
+                    pass # Custom slicing to be implemented
+                
+                # make_zslices(a, b, c)
+                
                 make_slices(d)
                 print(len(mct.slices.keys()), ' slices generated')
                 self.lineEdit_wall_thick.setEnabled(True)
