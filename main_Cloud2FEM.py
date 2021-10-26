@@ -244,22 +244,6 @@ def loadpcl():
         print('No Point Cloud selected')
 
 
-
-def make_zslices(a, b, c):
-    """
-    :param a: lowest z value (gui= from)
-    :param b: highest z value (gui= to)
-    :param c: fixed number of slices or fixed step height
-    """
-    mct.zslices = None
-    if win.rbtn_fixnum.isChecked():
-        mct.zslices = np.linspace(float(a), float(b), int(c))
-    elif win.rbtn_fixstep.isChecked():
-        mct.zslices = np.arange(float(a), float(b), float(c))
-    else:
-        pass  # Custom slicing da implementare
-
-
 def make_slices(d):
     """
     Given zslices, pcl and the slice thickness d, generates
@@ -843,7 +827,6 @@ class Window(QMainWindow):
                 else:
                     pass # Custom slicing to be implemented
                 
-                # make_zslices(a, b, c)
                 
                 make_slices(d)
                 print(len(mct.slices.keys()), ' slices generated')
