@@ -7,6 +7,8 @@
 
 
 import numpy as np
+import shapely
+import shapely.geometry as sg
 
 
 
@@ -137,7 +139,66 @@ def find_centroids(minwthick, zcoords, slices, tolsl=10, tolpt=2, tol=0.01, chec
                 break
         print('Slice:   ', "%.3f" % z, '        Slice n of points:  ', slices[z].shape[0], "     Derived centroids:  ", ctrds[z].shape[0])
     return ctrds
-        
+
+
+
+def make_polylines(minwthick, zcoords, ctrds, prcnt=5, minctrd=2, simpl_tol=0.035):
+    """
+    minwthick: Minimum wall thickness
+    zcoords  : 1-d np array of z coords as that returned by func "make_zcoords()"
+    ctrds    : Dict of centroyds as that returned by func "find_centroids()"
+    prcnt    : Percentile used to derive a threshold to discard short polylines, default=5
+    minctrd  : Min number of centroids that a polyline must possess not to be discarded, default=2
+    simpl_tol: Tolerance used to simplify the polylines through Douglas-Peucker, default=0.035 if [m]
+    
+    Given the arguments, returns a dict polys defined as key=zcoord_i,
+    value=[poly1, poly2,..., polyn], where polyn=np.array([[x1, y1], [x2, y2], ...).
+    Similarly, the other returned dict cleanpolys contains simplified polylines.                                                          
+    """
+    polys = {} # Dict to be filled: key=zcoord_i, value=polylines
+    for z in zcoords:
+        # For each centroid, calculate the distance between it and the 
+        # previous/following. If the distance is > than minwthick, 
+        # then break the unique polyline in that point
+        try:
+            dists = np.sqrt(np.square(ctrds[z][1:, 0] - ctrds[z][0:-1, 0])+
+                            np.square(ctrds[z][1:, 1] - ctrds[z][0:-1, 1]))
+            tails = np.where((dists >= minwthick) == True)
+            polys[z] = np.split(ctrds[z][:, : 2], tails[0] + 1)
+        except TypeError:
+            continue
+
+    # Checks the polylines lengths and derives a threshold to discard the
+    # ones made by few centroids
+    polyslen = []
+    for z in zcoords:
+        try:
+            for polyline in polys[z]:
+                polyslen += [len(polyline)]
+        except KeyError:
+            continue
+    polyslen = np.array(polyslen)
+    tolpolyslen = round(np.nanpercentile(polyslen, prcnt))
+    print('tol polylines length: ', tolpolyslen)
+
+    cleanpolys = {}  # Dict to be filled: key=zcoord_i, value=clean polylines
+    for z in zcoords:
+        zcleanpolys = []
+        try:
+            for poly in polys[z]:
+                if len(poly) < minctrd or len(poly) < tolpolyslen / 1.3: # 1.3 could be removed
+                    continue
+                rawpoly = sg.LineString(poly)
+                cleanpoly = rawpoly.simplify(simpl_tol, preserve_topology=True)
+                zcleanpolys += [np.array(cleanpoly)]
+            cleanpolys[z] = zcleanpolys
+            print(len(cleanpolys[z]), ' clean polylines found in slice ', "%.3f" % z)
+        except KeyError:
+            print('Slice ', z, ' skipped, it could be empty')
+            continue
+    return polys, cleanpolys
+
+
 
 
 

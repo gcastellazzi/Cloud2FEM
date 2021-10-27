@@ -246,50 +246,6 @@ def loadpcl():
 
 
 
-def make_polylines(minwthick):
-    """
-    #
-    """
-    mct.polys = {}
-    for z in mct.zcoords:
-        try:
-            dists = np.sqrt(np.square(mct.ctrds[z][1:, 0] - mct.ctrds[z][0:-1, 0])+
-                            np.square(mct.ctrds[z][1:, 1] - mct.ctrds[z][0:-1, 1]))
-            tails = np.where((dists >= minwthick) == True)
-            mct.polys[z] = np.split(mct.ctrds[z][:, : 2], tails[0] + 1)
-        except TypeError:
-            continue
-
-    # Checks the polylines lengths and derives a threshold to discard the shortest ones
-    polyslen = []
-    for z in mct.zcoords:
-        try:
-            for polyline in mct.polys[z]:
-                polyslen += [len(polyline)]
-        except KeyError:
-            continue
-    polyslen = np.array(polyslen)
-    tolpolyslen = round(np.nanpercentile(polyslen, 5))  # Di solito uso 5 percentile. Forse è poco, lo sporco rimane
-    print('tol polylines length: ', tolpolyslen)
-
-
-    mct.cleanpolys = {}
-    for z in mct.zcoords:
-        zcleanpolys = []
-        try:
-            for poly in mct.polys[z]:
-                if len(poly) < 2 or len(poly) < tolpolyslen / 1.3:  ####################################################################################### 2 è IL VALORE DI DEFAULT
-                    continue
-                rawpoly = sg.LineString(poly)
-                cleanpoly = rawpoly.simplify(0.035, preserve_topology=True)
-                zcleanpolys += [np.array(cleanpoly)]
-            mct.cleanpolys[z] = zcleanpolys
-            print(len(mct.cleanpolys[z]), ' clean polylines found in slice ', "%.3f" % z)
-        except KeyError:
-            print('Slice ', z, ' skipped, it could be empty')
-            continue
-
-
 def make_polygons(minwthick):
     """
     #
@@ -800,7 +756,9 @@ class Window(QMainWindow):
 
     def genpolylines_clicked(self):
         minwthick = float(self.lineEdit_wall_thick.text())
-        make_polylines(minwthick)
+        
+        mct.polys, mct.cleanpolys = cp.make_polylines(minwthick, mct.zcoords, mct.ctrds)
+        
         self.check_polylines.setEnabled(True)
         self.btn_gen_polygons.setEnabled(True)
         self.btn_edit_polylines.setEnabled(True)
