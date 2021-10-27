@@ -30,8 +30,8 @@ class Visp3dplot():
     def print_slices(self, mct):
         try:
             self.slices = visuals.Markers()
-            self.sliceplot = mct.slices[mct.zslices[0]]
-            for i in mct.zslices[1:]:
+            self.sliceplot = mct.slices[mct.zcoords[0]]
+            for i in mct.zcoords[1:]:
                 self.sliceplot = np.vstack((self.sliceplot, mct.slices[i]))
             self.slices.set_data(self.sliceplot, symbol='disc',
                                  face_color=(0 / 255, 0 / 255, 255 / 255, 1), size=4.3)
@@ -41,8 +41,8 @@ class Visp3dplot():
 
     def print_centr(self, mct):
         self.centroids = visuals.Markers()
-        self.centrplot = mct.ctrds[mct.zslices[0]]
-        for i in mct.zslices[1:]:
+        self.centrplot = mct.ctrds[mct.zcoords[0]]
+        for i in mct.zcoords[1:]:
             self.centrplot = np.vstack((self.centrplot, mct.ctrds[i]))
         self.centroids.set_data(self.centrplot, symbol='disc',
                              face_color=(255 / 255, 0 / 255, 0 / 255, 1), size=7)
@@ -50,7 +50,7 @@ class Visp3dplot():
 
     def print_polylines(self, mct):
         xyzplines = []
-        for z in mct.zslices:
+        for z in mct.zcoords:
             for poly in mct.cleanpolys[z]:
                 zcolumn = np.zeros((poly.shape[0], 1)) + z
                 xyzplines += [np.hstack((poly, zcolumn))]

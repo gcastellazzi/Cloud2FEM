@@ -30,7 +30,7 @@ from ezdxf.addons.geo import GeoProxy
 
 class MainContainer:
     def __init__(self, filepath=None, pcl=None, npts=None, zmin=None, zmax=None,
-                 xmin=None, xmax=None, ymin=None, ymax=None, zslices=None,
+                 xmin=None, xmax=None, ymin=None, ymax=None, zcoords=None,
                  slices=None, netpcl=None, ctrds=None, polys=None, cleanpolys=None,
                  polygs=None, xngrid=None, xelgrid=None, yngrid=None, yelgrid=None,
                  elemlist=None, nodelist=None, elconnect=None, temp_points=None,
@@ -45,18 +45,18 @@ class MainContainer:
         self.xmax = xmax
         self.ymin = ymin
         self.ymax = ymax
-        self.zslices = zslices      # 1D Numpy array of z coordinates utilized to create the slices below
-        self.slices = slices        # Dictionary where key(i)=zslices(i) and value(i)=np_array_xy(i)
+        self.zcoords = zcoords      # 1D Numpy array of z coordinates utilized to create the slices below
+        self.slices = slices        # Dictionary where key(i)=zcoords(i) and value(i)=np_array_xy(i)
         self.netpcl = netpcl        # pcl with empty spaces at slices position (for 3D visualization purposes)
         self.ctrds = ctrds          # Dictionary ordered as done for dict "slices"
-        self.polys = polys          # Dict key(i) = zslices(i), value(i) = [[np.arr.poly1],[np.a.poly2],[..],[np.polyn]]
+        self.polys = polys          # Dict key(i) = zcoords(i), value(i) = [[np.arr.poly1],[np.a.poly2],[..],[np.polyn]]
         self.cleanpolys = cleanpolys  # Polylines cleaned by the shapely simplify function
-        self.polygs = polygs        # Dict key(i) = zslices(i), value(i) = shapely MultiPolygon
+        self.polygs = polygs        # Dict key(i) = zcoords(i), value(i) = shapely MultiPolygon
         self.xngrid = xngrid
         self.xelgrid = xelgrid
         self.yngrid = yngrid
         self.yelgrid = yelgrid
-        self.elemlist = elemlist    # Dict key(i) = zslices(i), value(i) = [[x1, y1], [x2, y2], ..., [xn, yn]]
+        self.elemlist = elemlist    # Dict key(i) = zcoords(i), value(i) = [[x1, y1], [x2, y2], ..., [xn, yn]]
         self.nodelist = nodelist    # Np array, row[i] = [nodeID, x, y, z]
         self.elconnect = elconnect  # Np array, row[i] = [edelmID, nID1, nID2, nID3, nID4, nID5, nID6, nID7, nID8]
         self.temp_points = temp_points  # Modified array of PCloud points or centroids
@@ -83,7 +83,7 @@ def save_project():
         s['xmax'] = mct.xmax
         s['ymin'] = mct.ymin
         s['ymax'] = mct.ymax
-        s['zslices'] = mct.zslices
+        s['zcoords'] = mct.zcoords
         s['slices'] = mct.slices
         s['ctrds'] = mct.ctrds
         s['polys'] = mct.polys
@@ -115,7 +115,7 @@ def open_project():
             mct.xmax = s['xmax']
             mct.ymin = s['ymin']
             mct.ymax = s['ymax']
-            mct.zslices = s['zslices']
+            mct.zcoords = s['zcoords']
             mct.slices = s['slices']
             mct.ctrds = s['ctrds']
             #mct.polys = s['polys']
@@ -130,7 +130,7 @@ def open_project():
             mct.elconnect = s['elconnect']
             s.close()
 
-            for z in mct.zslices:
+            for z in mct.zcoords:
                 win.combo_slices.addItem(str('%.3f' % z))
             win.main2dplot()
 
@@ -246,85 +246,86 @@ def loadpcl():
 
 
 
-def find_centroids(minwthick):
-    """
-    #
-    """
-    mct.ctrds = {}
-    tolsl = 10                    # Minimum number of pts that a slice must have to be considered
-    tolpt = 2                     # Minimum number of points needed to calculate the centroid
-    tol = 0.01                    # Radius of the circle which defines the area where to look for near points
-    # newtol: first is set equal to tol, then can be increased for each slice in the calibration process
-    checkpts = 0.1                 # Fraction of the slice's points used to derive newtol
-    tolincr = 1.35                # Increment factor used to find the appropriate tolerance
-    for z in mct.zslices:
-        # Calibration of tol for every slice -> newtol
-        slcheckpts = mct.slices[z][np.random.choice(mct.slices[z].shape[0],
-                                                    size=round(mct.slices[z].shape[0] * checkpts), replace=False)]
-        newtol = tol
-        while True:
-            sumnearpts = 0
-            for checkpt in slcheckpts:
-                dists = np.sqrt(np.square(mct.slices[z][:, 0] - checkpt[0]) +
-                                np.square(mct.slices[z][:, 1] - checkpt[1]))
-                nearpts = mct.slices[z][dists <= newtol]
-                sumnearpts += nearpts.shape[0]
-            if newtol >= minwthick / tolincr:
-                print('\nTolerance adopted for slice ', "%.3f" % z, ':', "%.5f" % newtol)
-                break
-            elif sumnearpts < (15 * tolpt * slcheckpts.shape[0]):  # Values smaller than 3tolpt don't work really well. Default = 3.5, grezzo = 15
-                newtol *= tolincr
-                continue
-            else:
-                print('\nTolerance adopted for slice ', "%.3f" % z, ':', "%.5f" % newtol)
-                break
+# def find_centroids(minwthick):
+#     """
+#     #
+#     """
+#     mct.ctrds = {}
+#     tolsl = 10                    # Minimum number of pts that a slice must have to be considered
+#     tolpt = 2                     # Minimum number of points needed to calculate the centroid
+#     tol = 0.01                    # Radius of the circle which defines the area where to look for near points
+#     # newtol: first is set equal to tol, then can be increased for each slice in the calibration process
+#     checkpts = 0.1                 # Fraction of the slice's points used to derive newtol
+#     tolincr = 1.35                # Increment factor used to find the appropriate tolerance
+#     for z in mct.zcoords:
+#         # Calibration of tol for every slice -> newtol
+#         slcheckpts = mct.slices[z][np.random.choice(mct.slices[z].shape[0],
+#                                                     size=round(mct.slices[z].shape[0] * checkpts), replace=False)]
+#         newtol = tol
+#         while True:
+#             sumnearpts = 0
+#             for checkpt in slcheckpts:
+#                 dists = np.sqrt(np.square(mct.slices[z][:, 0] - checkpt[0]) +
+#                                 np.square(mct.slices[z][:, 1] - checkpt[1]))
+#                 nearpts = mct.slices[z][dists <= newtol]
+#                 sumnearpts += nearpts.shape[0]
+#             if newtol >= minwthick / tolincr:
+#                 print('\nTolerance adopted for slice ', "%.3f" % z, ':', "%.5f" % newtol)
+#                 break
+#             elif sumnearpts < (3.5 * tolpt * slcheckpts.shape[0]):  # Values smaller than 3tolpt don't work really well. Default = 3.5, grezzo = 15
+#                 newtol *= tolincr
+#                 continue
+#             else:
+#                 print('\nTolerance adopted for slice ', "%.3f" % z, ':', "%.5f" % newtol)
+#                 break
 
-        # Procedure for the first centroid
-        empsl = mct.slices[z][:, [0, 1]]        # Slice (2 columns np array) to be emptied
-        if empsl.shape[0] < tolsl:
-            mct.ctrds[z] = None
-            print("Slice:   ", "%.3f" % z, "            is empty")
-            continue
-        try:
-            while True:
-                stpnt = empsl[0]                    # Starting point
-                empsl = np.delete(empsl, 0, 0)      # Removes the starting point from empsl
-                dists = np.sqrt(np.square(empsl[:, 0] - stpnt[0]) +
-                                np.square(empsl[:, 1] - stpnt[1]))
-                nearpts = empsl[dists <= newtol]
-                if nearpts.shape[0] < tolpt:
-                    continue
-                mct.ctrds[z] = np.array([[nearpts[:, 0].mean(), nearpts[:, 1].mean(), z]])
-                empsl = empsl[dists > newtol]         # Removes the used points from empsl
-                ncs = 1                             # Number of found centroids
-                break
-        except IndexError:
-            print("Slice:   ", "%.3f" % z, "        Slice n of points:  ",
-                  mct.slices[z].shape[0],
-                  "     discarded because n of points is not sufficient for generating the centroids")
-            mct.ctrds[z] = None
-            continue
-        # Procedure for the following centroids
-        while True:
-            nearestidx = np.argmin(np.sqrt(np.square(empsl[:, 0] - mct.ctrds[z][ncs-1, 0]) +
-                                           np.square(empsl[:, 1] - mct.ctrds[z][ncs-1, 1])))
-            nearest = empsl[nearestidx]              # The new starting point (nearest to the last found centroid)
-            empsl = np.delete(empsl, nearestidx, 0)  # Removes the nearest point from empsl
-            dists = np.sqrt(np.square(empsl[:, 0] - nearest[0]) +
-                            np.square(empsl[:, 1] - nearest[1]))
-            nearpts = empsl[dists <= newtol]
-            if nearpts.shape[0] < tolpt and empsl.shape[0] > 0:
-                continue
-            elif empsl.shape[0] < 1:
-                break
-            mct.ctrds[z] = np.vstack((mct.ctrds[z],
-                                      np.array([nearpts[:, 0].mean(), nearpts[:, 1].mean(), z])))
-            empsl = empsl[dists > newtol]
-            ncs += 1
-            if empsl.shape[0] < 1:
-                break
-        print('Slice:   ', "%.3f" % z, '        Slice n of points:  ',  mct.slices[z].shape[0],
-              "     Derived centroids:  ", mct.ctrds[z].shape[0])
+#         # Procedure for the first centroid
+#         empsl = mct.slices[z][:, [0, 1]]        # Slice (2 columns np array) to be emptied
+#         if empsl.shape[0] < tolsl:
+#             mct.ctrds[z] = None
+#             print("Slice:   ", "%.3f" % z, "            is empty")
+#             continue
+#         try:
+#             while True:
+#                 stpnt = empsl[0]                    # Starting point
+#                 empsl = np.delete(empsl, 0, 0)      # Removes the starting point from empsl
+#                 dists = np.sqrt(np.square(empsl[:, 0] - stpnt[0]) +
+#                                 np.square(empsl[:, 1] - stpnt[1]))
+#                 nearpts = empsl[dists <= newtol]
+#                 if nearpts.shape[0] < tolpt:
+#                     continue
+#                 mct.ctrds[z] = np.array([[nearpts[:, 0].mean(), nearpts[:, 1].mean(), z]])
+#                 empsl = empsl[dists > newtol]         # Removes the used points from empsl
+#                 ncs = 1                             # Number of found centroids
+#                 break
+#         except IndexError:
+#             print("Slice:   ", "%.3f" % z, "        Slice n of points:  ",
+#                   mct.slices[z].shape[0],
+#                   "     discarded because n of points is not sufficient for generating the centroids")
+#             mct.ctrds[z] = None
+#             continue
+#         # Procedure for the following centroids
+#         while True:
+#             nearestidx = np.argmin(np.sqrt(np.square(empsl[:, 0] - mct.ctrds[z][ncs-1, 0]) +
+#                                            np.square(empsl[:, 1] - mct.ctrds[z][ncs-1, 1])))
+#             nearest = empsl[nearestidx]              # The new starting point (nearest to the last found centroid)
+#             empsl = np.delete(empsl, nearestidx, 0)  # Removes the nearest point from empsl
+#             dists = np.sqrt(np.square(empsl[:, 0] - nearest[0]) +
+#                             np.square(empsl[:, 1] - nearest[1]))
+#             nearpts = empsl[dists <= newtol]
+#             if nearpts.shape[0] < tolpt and empsl.shape[0] > 0:
+#                 continue
+#             elif empsl.shape[0] < 1:
+#                 break
+#             mct.ctrds[z] = np.vstack((mct.ctrds[z],
+#                                       np.array([nearpts[:, 0].mean(), nearpts[:, 1].mean(), z])))
+#             empsl = empsl[dists > newtol]
+#             ncs += 1
+#             if empsl.shape[0] < 1:
+#                 break
+#         print('Slice:   ', "%.3f" % z, '        Slice n of points:  ',  mct.slices[z].shape[0],
+#               "     Derived centroids:  ", mct.ctrds[z].shape[0])
+        
 
 
 def make_polylines(minwthick):
@@ -332,7 +333,7 @@ def make_polylines(minwthick):
     #
     """
     mct.polys = {}
-    for z in mct.zslices:
+    for z in mct.zcoords:
         try:
             dists = np.sqrt(np.square(mct.ctrds[z][1:, 0] - mct.ctrds[z][0:-1, 0])+
                             np.square(mct.ctrds[z][1:, 1] - mct.ctrds[z][0:-1, 1]))
@@ -343,7 +344,7 @@ def make_polylines(minwthick):
 
     # Checks the polylines lengths and derives a threshold to discard the shortest ones
     polyslen = []
-    for z in mct.zslices:
+    for z in mct.zcoords:
         try:
             for polyline in mct.polys[z]:
                 polyslen += [len(polyline)]
@@ -355,11 +356,11 @@ def make_polylines(minwthick):
 
 
     mct.cleanpolys = {}
-    for z in mct.zslices:
+    for z in mct.zcoords:
         zcleanpolys = []
         try:
             for poly in mct.polys[z]:
-                if len(poly) < 9 or len(poly) < tolpolyslen / 1.3:  ####################################################################################### 2 è IL VALORE DI DEFAULT
+                if len(poly) < 2 or len(poly) < tolpolyslen / 1.3:  ####################################################################################### 2 è IL VALORE DI DEFAULT
                     continue
                 rawpoly = sg.LineString(poly)
                 cleanpoly = rawpoly.simplify(0.035, preserve_topology=True)
@@ -377,10 +378,10 @@ def make_polygons(minwthick):
     """
     ######################################################################################################
     ######################################################################################################
-    # Piece of code introduced only to delete empty mct.zslices due to
+    # Piece of code introduced only to delete empty mct.zcoords due to
     # manual removal of points/centroids/polylines
     z_to_remove = []
-    for z in mct.zslices:
+    for z in mct.zcoords:
         try:
             for polyline in mct.cleanpolys[z]:
                 pass
@@ -389,7 +390,7 @@ def make_polygons(minwthick):
             print('removed: ', z)
 
     for r in z_to_remove:
-        mct.zslices = mct.zslices[mct.zslices != r]
+        mct.zcoords = mct.zcoords[mct.zcoords != r]
 
     #####################################################################################################
     #####################################################################################################
@@ -400,7 +401,7 @@ def make_polygons(minwthick):
 
     # Makes the polygons
     mct.polygs = {}
-    for z in mct.zslices:
+    for z in mct.zcoords:
         pgons = []
         for polyline in mct.cleanpolys[z]:
             try:
@@ -465,7 +466,7 @@ def exp_dxf():
             dxfdoc = ezdxf.new('R2013')
             msp = dxfdoc.modelspace()
 
-            for z in mct.zslices:
+            for z in mct.zcoords:
                 pygeoint = sg.mapping(mct.polygs[z])    # oppure asShape al posto di mapping
                 dxfentities = GeoProxy.to_dxf_entities(GeoProxy.parse(pygeoint))
                 for entity in dxfentities:
@@ -502,7 +503,7 @@ def test_plotpolygons():
     #############################################################"""
     import matplotlib.pyplot as plt
 
-    slidx = mct.zslices[int(win.lineEdit_test.text())]
+    slidx = mct.zcoords[int(win.lineEdit_test.text())]
     polyslice = mct.polygs[slidx]
     try:
         if len(polyslice) > 1:
@@ -528,7 +529,7 @@ def make_mesh(xeldim, yeldim):
     import time
     t0 = time.time()
     mct.elemlist = {}
-    for z in mct.zslices:
+    for z in mct.zcoords:
         initstack = 0
         for x in range(len(mct.xelgrid)):
             for y in range(len(mct.yelgrid)):
@@ -553,21 +554,21 @@ def make_mesh(xeldim, yeldim):
     ignore = []  # Nodes to ignore when comparing
     zignore = 0  # Nodes found in the current slice that will be ignored later
 
-    for z in range(len(mct.zslices)):
-        crntz = mct.zslices[z]              # Current z
+    for z in range(len(mct.zcoords)):
+        crntz = mct.zcoords[z]              # Current z
         print('GENERATING ELEMENTS FOR SLICE ', crntz)
-        if z != len(mct.zslices) - 1:
-            elh = mct.zslices[z+1] - crntz  # Elements height
+        if z != len(mct.zcoords) - 1:
+            elh = mct.zcoords[z+1] - crntz  # Elements height
         else:
-            elh = crntz - mct.zslices[z-1]  # Height of the elements of the last slice
+            elh = crntz - mct.zcoords[z-1]  # Height of the elements of the last slice
         abcde = np.array([[0, 1, 2, 3]]) ##################### TEST FOR VSTACK NEW NODES
         z_elconnect = []  ################ TEST FOR VSTACK NEW ELEMENTS
         c_info = 0
-        for elem in mct.elemlist[mct.zslices[z]]:
+        for elem in mct.elemlist[mct.zcoords[z]]:
             # Print info message
             c_info += 1
             if c_info % 1000 == 0:
-                print('Zslice: ', mct.zslices[z], ', element', c_info, ' of ', mct.elemlist[mct.zslices[z]].shape[0])
+                print('Zcoord: ', mct.zcoords[z], ', element', c_info, ' of ', mct.elemlist[mct.zcoords[z]].shape[0])
             ###
             tempel = [elID]
             for node in range(8):  # Element node number 0 -> 7
@@ -803,19 +804,19 @@ class Window(QMainWindow):
                 msg_slices.setIcon(QMessageBox.Warning)
                 x = msg_slices.exec_()
             else:
-                mct.zslices = None
+                mct.zcoords = None
                 if self.rbtn_fixnum.isChecked():
-                    mct.zslices = cp.make_zcoords(a, b, c, 1)
+                    mct.zcoords = cp.make_zcoords(a, b, c, 1)
                 elif self.rbtn_fixstep.isChecked():
-                    mct.zslices = cp.make_zcoords(a, b, c, 2)
+                    mct.zcoords = cp.make_zcoords(a, b, c, 2)
                 else:
                     pass # Custom slicing to be implemented
                     
                 mct.slices = None
                 mct.netpcl = None
-                mct.slices, mct.netpcl = cp.make_slices(mct.zslices, mct.pcl, float(d), mct.npts)
+                mct.slices, mct.netpcl = cp.make_slices(mct.zcoords, mct.pcl, float(d), mct.npts)
                 self.combo_slices.clear()
-                for z in mct.zslices:
+                for z in mct.zcoords:
                     self.combo_slices.addItem(str('%.3f' % z))  # Populates the gui slices combobox
                 
                 print(len(mct.slices.keys()), ' slices generated')
@@ -854,7 +855,10 @@ class Window(QMainWindow):
     def gencentr_clicked(self):
         try:
             minwthick = float(self.lineEdit_wall_thick.text())
-            find_centroids(minwthick)
+            
+            mct.ctrds = None
+            mct.ctrds = cp.find_centroids(minwthick, mct.zcoords, mct.slices)
+            
             self.check_centroids.setEnabled(True)
             self.btn_edit_centroids.setEnabled(True)
             self.btn_gen_polylines.setEnabled(True)
@@ -913,7 +917,7 @@ class Window(QMainWindow):
         ############## Cython TEST ############################################
         # from make_mesh_func import make_mesh
         # mct.elemlist, mct.nodelist, mct.elconnect = make_mesh(
-        #     xeldim, yeldim, mct.xmin, mct.ymin, mct.xmax, mct.ymax, mct.zslices, mct.polygs)
+        #     xeldim, yeldim, mct.xmin, mct.ymin, mct.xmax, mct.ymax, mct.zcoords, mct.polygs)
         #######################################################################
         make_mesh(xeldim, yeldim)
         self.check_mesh.setEnabled(True)
@@ -966,7 +970,7 @@ class Window(QMainWindow):
         if chkmesh:
             p3d.print_mesh(mct)
         if chkpcl and (chksli or chkctr or chkply or chkmesh):
-            p3d.print_cloud(mct.netpcl, 0.3)   ################################################################################# default alpha = 0.75
+            p3d.print_cloud(mct.netpcl, 0.5)   ################################################################################# default alpha = 0.75
         elif chkpcl:
             p3d.print_cloud(mct.pcl, 1)
         p3d.final3dsetup()
@@ -982,33 +986,33 @@ class Window(QMainWindow):
             self.plot2d.plot((min(xngrid), max(xngrid)), (y, y), pen=pg.mkPen(color=(220, 220, 220, 255), width=1.5))
 
     def plot_slice(self):
-        slm2dplt = mct.slices[mct.zslices[self.combo_slices.currentIndex()]][:, [0, 1]]
-        scatter2d = pg.ScatterPlotItem(pos=slm2dplt, size=9, brush=pg.mkBrush(0, 0, 0, 255))    #### default size = 5
+        slm2dplt = mct.slices[mct.zcoords[self.combo_slices.currentIndex()]][:, [0, 1]]
+        scatter2d = pg.ScatterPlotItem(pos=slm2dplt, size=5, brush=pg.mkBrush(0, 0, 0, 255))    #### default size = 5
         # scatter2d = pg.ScatterPlotItem(pos=slm2dplt, size=2.7, brush=pg.mkBrush(0, 0, 255, 255))
         self.plot2d.addItem(scatter2d)
 
     def plot_centroids(self):
-        ctrsm2dplt = mct.ctrds[mct.zslices[self.combo_slices.currentIndex()]][:, [0, 1]]
+        ctrsm2dplt = mct.ctrds[mct.zcoords[self.combo_slices.currentIndex()]][:, [0, 1]]
         # ctrsscatter2d = pg.ScatterPlotItem(pos=ctrsm2dplt, size=7, brush=pg.mkBrush(255, 0, 0, 255))
-        ctrsscatter2d = pg.ScatterPlotItem(pos=ctrsm2dplt, size=25, brush=pg.mkBrush(255, 0, 0, 255)) ######### default size = 13
+        ctrsscatter2d = pg.ScatterPlotItem(pos=ctrsm2dplt, size=13, brush=pg.mkBrush(255, 0, 0, 255)) ######### default size = 13
         self.plot2d.addItem(ctrsscatter2d)
 
     def plot_polylines(self):
-        for poly in mct.polys[mct.zslices[self.combo_slices.currentIndex()]]:
+        for poly in mct.polys[mct.zcoords[self.combo_slices.currentIndex()]]:
             # self.plot2d.plot(poly, pen=pg.mkPen(color='b', width=2))
             colr = np.random.randint(120, 255)
             colg = np.random.randint(1, 5)
             colb = np.random.randint(1, 5)
             # self.plot2d.plot(poly[:, : 2], pen=pg.mkPen(color=(colr, colg, colb, 255), width=3))
-            self.plot2d.plot(poly[:, : 2], pen=pg.mkPen(color=(0, 0, 255, 255), width=7))   ################### default width = 3
+            self.plot2d.plot(poly[:, : 2], pen=pg.mkPen(color=(0, 0, 255, 255), width=3))   ################### default width = 3
 
     def plot_polys_clean(self):
-        for poly in mct.cleanpolys[mct.zslices[self.combo_slices.currentIndex()]]:
+        for poly in mct.cleanpolys[mct.zcoords[self.combo_slices.currentIndex()]]:
             colr = np.random.randint(1, 5)
             colg = np.random.randint(1, 5)
             colb = np.random.randint(120, 255)
             # self.plot2d.plot(poly[:, : 2], pen=pg.mkPen(color=(colr, colg, colb, 255), width=3))
-            self.plot2d.plot(poly[:, : 2], pen=pg.mkPen(color=(0, 0, 0, 255), width=9))   ###### default width = 5
+            self.plot2d.plot(poly[:, : 2], pen=pg.mkPen(color=(0, 0, 0, 255), width=5))   ###### default width = 5
 
     def main2dplot(self):
         chk2dsli = self.check_2d_slice.isChecked()
@@ -1101,7 +1105,7 @@ class Window(QMainWindow):
 
     def scatter_editMode(self, pointdict):
         self.main2dplot()
-        z = mct.zslices[self.combo_slices.currentIndex()]
+        z = mct.zcoords[self.combo_slices.currentIndex()]
         self.combo_slices.setEnabled(False)
 
         mct.temp_points = pointdict[z]
@@ -1245,7 +1249,7 @@ class Window(QMainWindow):
         self.btn_add_polyline.setEnabled(True)
         self.combo_slices.setEnabled(False)
         self.gui_edit_status(False)
-        z = mct.zslices[self.combo_slices.currentIndex()]
+        z = mct.zcoords[self.combo_slices.currentIndex()]
         mct.temp_polylines = mct.cleanpolys[z].copy()
         self.poly_rois()
         self.main2dplot()
@@ -1274,7 +1278,7 @@ class Window(QMainWindow):
         if mct.editmode == 0 or mct.editmode == 1:
             self.plot2d.scene().sigMouseClicked.disconnect(self.remove_points_rect)
             self.plot2d.scene().sigMouseMoved.disconnect(self.draw_temp_rect)
-        z = mct.zslices[self.combo_slices.currentIndex()]
+        z = mct.zcoords[self.combo_slices.currentIndex()]
         if mct.editmode == 0:
             mct.slices[z] = mct.temp_points
             self.status_centroids.setStyleSheet("background-color: rgb(255, 0, 0);")
@@ -1370,12 +1374,12 @@ class Window(QMainWindow):
         copydialog.setWindowTitle("Copy slice's polylines")
         copydialog.combo_copy_pl.clear()
 
-        for z in mct.zslices:
+        for z in mct.zcoords:
             copydialog.combo_copy_pl.addItem(str('%.3f' % z))
 
         paste_slice = []
-        for z in mct.zslices:
-            slice_index = np.where(z == mct.zslices[:])[0][0]
+        for z in mct.zcoords:
+            slice_index = np.where(z == mct.zcoords[:])[0][0]
             paste_slice += [QtWidgets.QCheckBox()]
             paste_slice[slice_index].setText(str('%.3f' % z))
             copydialog.scrollArea_lay.layout().addWidget(paste_slice[slice_index])
@@ -1392,10 +1396,10 @@ class Window(QMainWindow):
             copydialog.close()
 
         def copy_ok():
-            tocopy = mct.cleanpolys[mct.zslices[copydialog.combo_copy_pl.currentIndex()]]
+            tocopy = mct.cleanpolys[mct.zcoords[copydialog.combo_copy_pl.currentIndex()]]
             for i in range(len(paste_slice)):
                 if paste_slice[i].isChecked():
-                    mct.cleanpolys[mct.zslices[i]] = tocopy
+                    mct.cleanpolys[mct.zcoords[i]] = tocopy
             win.status_polygons.setStyleSheet("background-color: rgb(255, 0, 0);")
             win.status_mesh.setStyleSheet("background-color: rgb(255, 0, 0);")
             copydialog.close()
