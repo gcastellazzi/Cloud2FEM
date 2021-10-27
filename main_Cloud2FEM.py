@@ -19,6 +19,7 @@ import ezdxf
 from ezdxf.addons.geo import GeoProxy
 #import FEM_functions as ff
 
+
 ##### PASSO PER TEST SU NUVOLA IDEALE
 # MEDIO: from 0.3 to 6.5, n°slices 13, slice thickness 0.01
 # GREZZO: from 0.3 to 4.3, n°slices 7,  slice thickness 0.01
