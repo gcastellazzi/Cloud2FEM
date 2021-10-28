@@ -166,10 +166,9 @@ def open_project():
                 win.status_mesh.setStyleSheet("background-color: rgb(0, 255, 0);")
                 win.exp_mesh.setEnabled(True)
 
-
-
         except ValueError:
             print('No project file selected')
+
 
 
 def loadpcl():
@@ -246,91 +245,6 @@ def loadpcl():
 
 
 
-def make_polygons(minwthick):
-    """
-    #
-    """
-    ######################################################################################################
-    ######################################################################################################
-    # Piece of code introduced only to delete empty mct.zcoords due to
-    # manual removal of points/centroids/polylines
-    z_to_remove = []
-    for z in mct.zcoords:
-        try:
-            for polyline in mct.cleanpolys[z]:
-                pass
-        except KeyError:
-            z_to_remove.append(z)
-            print('removed: ', z)
-
-    for r in z_to_remove:
-        mct.zcoords = mct.zcoords[mct.zcoords != r]
-
-    #####################################################################################################
-    #####################################################################################################
-
-
-    mct.polygs = None
-    invalidpolygons = []
-
-    # Makes the polygons
-    mct.polygs = {}
-    for z in mct.zcoords:
-        pgons = []
-        for polyline in mct.cleanpolys[z]:
-            try:
-                isvalid = 1
-                tolsimpl = 0.035  # Default tolerance for simplifying the polygon if it is invalid
-                newpgon = sg.Polygon(polyline)
-            except ValueError:
-                print('Error in slice ', z, 'Try to eliminate isolated segments')
-            while True:
-                if newpgon.is_valid:
-                    break
-                elif tolsimpl >= minwthick / 2.5 and not newpgon.is_valid:
-                    isvalid = 0
-                    invalidpolygons += [z]  # Needed to show a warning message
-                    # Generates a translated copy and performs an invalid operation to generate an useful error message
-                    tranpgon = shapely.affinity.translate(newpgon, xoff=0.005, yoff=-0.005)
-                    try:
-                        invalidoperation = newpgon.symmetric_difference(tranpgon)
-                    except Exception as e:
-                        print('!!! Invalid polygon found in slice ' + "%.3f" % z + ' !!!')
-                        print(e)
-                    break
-                else:
-                    tolsimpl += minwthick / 50
-                    newpgon.simplify(tolsimpl, preserve_topology=True)
-            if isvalid == 0:
-                continue
-            else:
-                pgons += [newpgon]
-        print('slice: ', "%.3f" % z, ', independent polygons generated: ', len(pgons))
-
-        try:
-            temp = pgons[0]
-            if len(pgons) >= 2:
-                for j in range(len(pgons) - 1):
-                    temp = temp.symmetric_difference(pgons[j + 1])
-                mct.polygs[z] = temp
-            elif len(pgons) == 1:
-                mct.polygs[z] = temp
-            else:
-                print('Slice: ', "%.3f" % z, '   No poligons generated')
-        except IndexError:
-            print('Index error in "temp = pgons[0]"')
-            pass
-
-    if len(invalidpolygons) != 0:
-        msg_invpoligons = QMessageBox()
-        msg_invpoligons.setWindowTitle('Generate Polygons')
-        invalidlist = ''
-        for z in invalidpolygons:
-            invalidlist += str('\n' + "%.3f" % z)
-        msg_invpoligons.setText("\nInvalid Polygons in slices: " + invalidlist)
-        msg_invpoligons.setIcon(QMessageBox.Warning)
-        x = msg_invpoligons.exec_()
-
 
 def exp_dxf():
         try:
@@ -358,17 +272,6 @@ def exp_dxf():
         except (ValueError, TypeError, FileNotFoundError):
             print('No dxf name specified')
 
-
-def haslen(anyobj):
-    """
-    Per adesso inutilizzata, servirà per estrarre
-    la geometria annidata di shapely
-    """
-    try:
-        len(anyobj)
-        return True
-    except:
-        return False
 
 
 def test_plotpolygons():
@@ -678,7 +581,6 @@ class Window(QMainWindow):
                 msg_slices.setIcon(QMessageBox.Warning)
                 x = msg_slices.exec_()
             else:
-                mct.zcoords = None
                 if self.rbtn_fixnum.isChecked():
                     mct.zcoords = cp.make_zcoords(a, b, c, 1)
                 elif self.rbtn_fixstep.isChecked():
@@ -686,8 +588,6 @@ class Window(QMainWindow):
                 else:
                     pass # Custom slicing to be implemented
                     
-                mct.slices = None
-                mct.netpcl = None
                 mct.slices, mct.netpcl = cp.make_slices(mct.zcoords, mct.pcl, float(d), mct.npts)
                 self.combo_slices.clear()
                 for z in mct.zcoords:
@@ -730,7 +630,6 @@ class Window(QMainWindow):
         try:
             minwthick = float(self.lineEdit_wall_thick.text())
             
-            mct.ctrds = None
             mct.ctrds = cp.find_centroids(minwthick, mct.zcoords, mct.slices)
             
             self.check_centroids.setEnabled(True)
@@ -775,7 +674,19 @@ class Window(QMainWindow):
 
     def genpolygons_clicked(self):
         minwthick = float(self.lineEdit_wall_thick.text())
-        make_polygons(minwthick)
+        
+        mct.polygs, invalidpolygons = cp.make_polygons(minwthick, mct.zcoords, mct.cleanpolys)
+        
+        if len(invalidpolygons) != 0:
+            msg_invpoligons = QMessageBox()
+            msg_invpoligons.setWindowTitle('Generate Polygons')
+            invalidlist = ''
+            for z in invalidpolygons:
+                invalidlist += str('\n' + "%.3f" % z)
+            msg_invpoligons.setText("\nInvalid Polygons in slices: " + invalidlist)
+            msg_invpoligons.setIcon(QMessageBox.Warning)
+            x = msg_invpoligons.exec_()
+        
         self.btn_gen_mesh.setEnabled(True)
         self.exp_dxf.setEnabled(True)
         self.status_polygons.setStyleSheet("background-color: rgb(0, 255, 0);")

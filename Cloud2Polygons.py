@@ -12,6 +12,8 @@ import shapely.geometry as sg
 
 
 
+
+
 def make_zcoords(a, b, c, d):
     """
     a: zmin
@@ -29,6 +31,8 @@ def make_zcoords(a, b, c, d):
     elif d == 3:
         pass  ### To be DONE ###########
     return zcoords
+
+
 
 
 
@@ -55,6 +59,8 @@ def make_slices(zcoords, pcl, thick, npts):
         invmask *= np.invert(mask)  # For 3D visualization purposes
     netpcl = pcl[invmask, :]  # Net point cloud for 3D visualization purposes
     return slices, netpcl
+
+
 
 
 
@@ -142,6 +148,8 @@ def find_centroids(minwthick, zcoords, slices, tolsl=10, tolpt=2, tol=0.01, chec
 
 
 
+
+
 def make_polylines(minwthick, zcoords, ctrds, prcnt=5, minctrd=2, simpl_tol=0.035):
     """
     minwthick: Minimum wall thickness
@@ -151,7 +159,7 @@ def make_polylines(minwthick, zcoords, ctrds, prcnt=5, minctrd=2, simpl_tol=0.03
     minctrd  : Min number of centroids that a polyline must possess not to be discarded, default=2
     simpl_tol: Tolerance used to simplify the polylines through Douglas-Peucker, default=0.035 if [m]
     
-    Given the arguments, returns a dict polys defined as key=zcoord_i,
+    Given the arguments, returns a dict "polys" defined as key=zcoord_i,
     value=[poly1, poly2,..., polyn], where polyn=np.array([[x1, y1], [x2, y2], ...).
     Similarly, the other returned dict cleanpolys contains simplified polylines.                                                          
     """
@@ -202,17 +210,84 @@ def make_polylines(minwthick, zcoords, ctrds, prcnt=5, minctrd=2, simpl_tol=0.03
 
 
 
+def make_polygons(minwthick, zcoords, cleanpolys, tolsimpl=0.035):
+    """
+    minwthick : Minimum wall thickness
+    zcoords   : 1-d np array of z coords as that returned by func "make_zcoords()"
+    cleanpolys: Dict of clean polylines as that returned by func "make_polylines()"
+    tolsimpl  : Douglas-Peucker tol, used only if a polygon is invalid, default = 0.035
+    
+    Given the arguments, returns a dict "polygs" defined as key=zcoord_i
+    and value=MultiPolygon, a common 2D geometry data structure used by
+    the Shapely package.
+    The returned list invalidpolygons is only needed to help the user solve problems in the gui.
+    """
+    # Remove empty zcoords due to manual removal of points/centroids/polylines
+    z_to_remove = []
+    for z in zcoords:
+        try:
+            for polyline in cleanpolys[z]:
+                pass
+        except KeyError:
+            z_to_remove.append(z)
+            print('removed: ', z)
 
+    for r in z_to_remove:
+        zcoords = zcoords[zcoords != r]
+    
+    # Make Polygons 
+    invalidpolygons = []  # List of invalid polygons to be filled [zcoord1, zcoord2,..]
+    polygs = {}  # Dict to be filled: key=zcoord_i, value=MultiPolygon
+    
+    for z in zcoords:
+        pgons = []  # List of Polygons of slice z, to be filled
+        for polyline in cleanpolys[z]:
+            try:
+                isvalid = 1
+                newpgon = sg.Polygon(polyline)  # Just converted a polyline into the shapely Polygon data structure
+            except ValueError:
+                print('Error in slice ', z, 'Try to eliminate isolated segments')
+            while True:
+                if newpgon.is_valid:
+                    break
+#########################################################################################
+### This portion of code tries to adjust an invalid polygon ############################
+                elif tolsimpl >= minwthick / 2.5 and not newpgon.is_valid:
+                    isvalid = 0
+                    invalidpolygons += [z]  # Needed to show a warning message
+                    # Generates a translated copy and performs an invalid operation to generate an useful error message
+                    tranpgon = shapely.affinity.translate(newpgon, xoff=0.005, yoff=-0.005)
+                    try:
+                        invalidoperation = newpgon.symmetric_difference(tranpgon)
+                    except Exception as e:
+                        print('!!! Invalid polygon found in slice ' + "%.3f" % z + ' !!!')
+                        print(e)
+                    break
+                else:
+                    tolsimpl += minwthick / 50
+                    newpgon.simplify(tolsimpl, preserve_topology=True)
+#########################################################################################
+            if isvalid == 0:
+                continue
+            else:
+                pgons += [newpgon]
+        print('slice: ', "%.3f" % z, ', independent polygons generated: ', len(pgons))
 
-
-
-
-
-
-
-
-
-
+        try:
+            # Perform boolean operation between Polygons to get a unique MultiPolygon per slice z
+            temp = pgons[0]
+            if len(pgons) >= 2:
+                for j in range(len(pgons) - 1):
+                    temp = temp.symmetric_difference(pgons[j + 1])
+                polygs[z] = temp
+            elif len(pgons) == 1:
+                polygs[z] = temp
+            else:
+                print('Slice: ', "%.3f" % z, '   No poligons generated')
+        except IndexError:
+            print('Index error in "temp = pgons[0]"')
+            pass
+    return polygs, invalidpolygons
 
 
 
@@ -224,4 +299,7 @@ if __name__ == "__main__":
     # SOME TEST CODE
     zcoords1 = make_zcoords(1, 50, 5, 1)
     zcoords2 = make_zcoords(1, 50, 5, 2)
+
+
+
 
