@@ -3,7 +3,6 @@
 # obtain a set of polygons at specified z coordinates
 ###############################################################################
 
-## WORK IN PROGRESS !!!!!
 
 
 import numpy as np
