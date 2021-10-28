@@ -8,11 +8,35 @@ import shapely.geometry as sg
 
 
 
-def make_mesh(xeldim, yeldim):
-    mct.xngrid = np.arange(mct.xmin - xeldim, mct.xmax + 2 * xeldim, xeldim)  # x node grid
-    mct.xelgrid = mct.xngrid[: -1] + xeldim / 2                               # x element grid
-    mct.yngrid = np.arange(mct.ymin - yeldim, mct.ymax + 2 * yeldim, yeldim)
-    mct.yelgrid = mct.yngrid[: -1] + yeldim / 2
+def make_mesh(xeldim, yeldim, xmin, ymin, xmax, ymax):
+    #
+    #                    Grid definition 
+    #  
+    #                ___|_______|_______|___ yn2
+    #                   |       |       |
+    #                   |       |       |
+    #                   |   *   |   *   |  ye1
+    #                   |       |       |
+    #                ___|_______|_______|___ yn1
+    #                   |       |       |
+    #                   |       |       |
+    #                   |   *   |   *   |  ye0
+    #                   |  xe0  |  xe1  |
+    #                ___|_______|_______|___ yn0
+    #   y|              |       |       |
+    #    |____x         |       |       |
+    #                  xn0     xn1     xn2
+    #
+    
+    """
+    xeldim: Dimension 
+    
+
+    """
+    xngrid = np.arange(xmin - xeldim, xmax + 2 * xeldim, xeldim)  # x node grid
+    xelgrid = xngrid[: -1] + xeldim / 2                               # x element grid
+    yngrid = np.arange(ymin - yeldim, ymax + 2 * yeldim, yeldim)
+    yelgrid = yngrid[: -1] + yeldim / 2
 
     # Selects the elements inside the Shapely MultiPolygons
     # and returns a dict of np array whose lines represent an element=[xelgridID, yelgridID]
@@ -31,7 +55,7 @@ def make_mesh(xeldim, yeldim):
                         initstack += 1
     t1 = time.time()
     t = t1 - t0
-    print('Shapely code, elapsed time: ', str(t))
+    print('Shapely code, elapsed time:  ', str(t))
 
     # Creates the list of nodes and elements connectivity. Elements are extruded from the bottom to the top
     t0 = time.time()

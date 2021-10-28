@@ -1,6 +1,6 @@
 ###############################################################################
 # This module contains all the functions that, given a point cloud, allow to
-# obtain a set of polygons at specified z coordinates
+# obtain a set of MultiPolygons at specified z coordinates
 ###############################################################################
 
 
