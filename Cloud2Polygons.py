@@ -1,6 +1,8 @@
 ###############################################################################
 # This module contains all the functions that, given a point cloud, allow to
-# obtain a set of MultiPolygons at specified z coordinates
+# obtain a set of MultiPolygons at specified z coordinates.
+#
+# Run this file as __main__ to see an example
 ###############################################################################
 
 
@@ -149,14 +151,14 @@ def find_centroids(minwthick, zcoords, slices, tolsl=10, tolpt=2, tol=0.01, chec
 
 
 
-def make_polylines(minwthick, zcoords, ctrds, prcnt=5, minctrd=2, simpl_tol=0.035):
+def make_polylines(minwthick, zcoords, ctrds, prcnt=5, minctrd=2, simpl_tol=0.025):
     """
     minwthick: Minimum wall thickness
     zcoords  : 1-d np array of z coords as that returned by func "make_zcoords()"
     ctrds    : Dict of centroyds as that returned by func "find_centroids()"
     prcnt    : Percentile used to derive a threshold to discard short polylines, default=5
     minctrd  : Min number of centroids that a polyline must possess not to be discarded, default=2
-    simpl_tol: Tolerance used to simplify the polylines through Douglas-Peucker, default=0.035 if [m]
+    simpl_tol: Tolerance used to simplify the polylines through Douglas-Peucker, default=0.02 if [m]
     
     Given the arguments, returns a dict "polys" defined as key=zcoord_i,
     value=[poly1, poly2,..., polyn], where polyn=np.array([[x1, y1], [x2, y2], ...).
@@ -165,8 +167,8 @@ def make_polylines(minwthick, zcoords, ctrds, prcnt=5, minctrd=2, simpl_tol=0.03
     polys = {} # Dict to be filled: key=zcoord_i, value=polylines
     for z in zcoords:
         # For each centroid, calculate the distance between it and the 
-        # previous/following. If the distance is > than minwthick, 
-        # then break the unique polyline in that point
+        # previous. If the distance is > than minwthick, then split the
+        # unique polyline removing the segment between them.
         try:
             dists = np.sqrt(np.square(ctrds[z][1:, 0] - ctrds[z][0:-1, 0])+
                             np.square(ctrds[z][1:, 1] - ctrds[z][0:-1, 1]))
@@ -293,12 +295,136 @@ def make_polygons(minwthick, zcoords, cleanpolys, tolsimpl=0.035):
 
 
 
+##################################################################     EXAMPLE
+##########################################################################################################################################
+##########################################################################################################################################
+##########################################################################################################################################
 
 if __name__ == "__main__":
-    # SOME TEST CODE
-    zcoords1 = make_zcoords(1, 50, 5, 1)
-    zcoords2 = make_zcoords(1, 50, 5, 2)
-
-
-
+    
+    import matplotlib.pyplot as plt
+    
+    def make_lines(n_of_points, noise, ac, bc, direction):
+        """ 
+        n_of_points : This is NOT the final number of points. Use a big number
+        noise       : Noise of the point cloud
+        ac          : Coordinates in the a direction
+        bc          : Coordinates in the b direction
+        direction   : Lines of points are generated parallel to 'x' or 'y'
+        
+        If ac = xcoords and bc = ycoords, direction = 'x', the function returns an array of points
+        aligned (with noise) with four vertical lines placed at xcoords[0], xcoords[1] etc.,
+        in the range of ycoords[0] < points < ycoords[3].
+        Use ac = ycoords and bc = xcoords and direction = 'y' to obtain four horizontal lines.
+        """
+        rand_p = np.random.uniform(ac[0], ac[3], n_of_points) # Random numbers between ac[0] and ac[3]
+        
+        outer_a = rand_p[np.logical_or(rand_p <= ac[0] + noise, rand_p >= ac[3] - noise)]  # Select only points near ac[0] and ac[3]
+        outer_b = np.random.uniform(bc[0], bc[3], outer_a.shape[0])
+        inner_a = rand_p[np.logical_or(np.logical_and(rand_p <= ac[1] + noise, rand_p > ac[1]), np.logical_and(rand_p >= ac[2] - noise, rand_p < ac[2]))]  # Select only points near ac[1] and ac[2]
+        inner_b = np.random.uniform(bc[1], bc[2], inner_a.shape[0])
+        
+        outer_a = outer_a.reshape(outer_a.shape[0], 1)
+        outer_b = outer_b.reshape(outer_a.shape[0], 1)
+        inner_a = inner_a.reshape(inner_a.shape[0], 1)
+        inner_b = inner_b.reshape(inner_a.shape[0], 1)
+        
+        if direction == 'x':
+            outer = np.hstack((outer_a, outer_b))  # xy np array representing the two external vertical lines
+            inner = np.hstack((inner_a, inner_b))  # xy np array representing the two internal vertical lines
+        elif direction == 'y':
+            outer = np.hstack((outer_b, outer_a))  # xy np array representing the two external horizontal lines
+            inner = np.hstack((inner_b, inner_a))  # xy np array representing the two internal horizontal lines
+        
+        lines = np.vstack((outer, inner))
+        return lines
+    
+    
+    # Create the fake point cloud
+    n_of_points = 1500000  # This is NOT the final number of points. Use a big number
+    noise = 0.007
+    min_wall_thick = 0.08
+    xcoords = [0, 0.1, 0.9, 1.0]  # x coordinates of the four vertical lines
+    ycoords = [0, 0.1, 0.3, 0.4]  # y coordinates of the four horizontal lines
+    zmin, zmax = 0, 0.4
+    
+    # Use func make_lines to create a fake point cloud
+    pcl2d = np.vstack((make_lines(n_of_points, noise, xcoords, ycoords, 'x'), make_lines(n_of_points, noise, ycoords, xcoords, 'y')))  # Point cloud 2D
+    zcoords = np.random.uniform(zmin, zmax, pcl2d.shape[0])
+    pcl3d = np.hstack((pcl2d, zcoords.reshape(pcl2d.shape[0], 1))) # Final fake 3D Point cloud
+    print('Number of points of the Point Cloud: ', pcl3d.shape[0])
+        
+    # Choose the z coordinates where to slice
+    zcoords = make_zcoords(0.1, zmax, 0.1, 2)
+    print('Z coordinates of the slices: ', zcoords)
+    
+    # Extract the slices of points from the point cloud
+    sl_thickness = 0.01
+    slices = make_slices(zcoords, pcl3d, sl_thickness, pcl3d.shape[0])[0]
+    
+    # Find the centroids
+    centroids = find_centroids(min_wall_thick, zcoords, slices)
+    
+    # Derive the polylines
+    rawpolylines, cleanpolylines = make_polylines(min_wall_thick, zcoords, centroids, simpl_tol=0.01)
+    
+    # Make the MultiPolygons
+    polygons = make_polygons(min_wall_thick, zcoords, cleanpolylines)[0]
+    
+    # Plot everything in 3D
+    fig = plt.figure()
+    fig.subplots_adjust(wspace=0.2, hspace=0.2)   
+    fig.suptitle('From a Point cloud to MultiPolygons')
+    axs = [fig.add_subplot(2, 3, n, projection='3d') for n in range(1, 7)]
+    
+    axs[0].set_title('Point Cloud \n(commented code)')
+    axs[1].set_title('Point Cloud Slices')
+    axs[2].set_title('Centroids')
+    axs[3].set_title('Raw Polylines ')
+    axs[4].set_title('Clean Polylines')
+    axs[5].set_title('MultiPolygons')
+    
+    for ax in axs:
+        ax.set_xlabel('x')
+        ax.set_ylabel('y')
+        ax.set_zlabel('z')
+    
+    # axs[0].scatter(pcl3d[:, 0], pcl3d[:, 1], pcl3d[:, 2], s=0.3, c='grey')
+    
+    i = 0
+    clr = ['red', 'blue', 'green', 'black', 'orange']
+    
+    for z in zcoords:
+        axs[1].scatter(slices[z][:, 0], slices[z][:, 1], slices[z][:, 2], s=0.5, marker=".")
+    
+        axs[2].scatter(centroids[z][:, 0], centroids[z][:, 1], z*np.ones(centroids[z].shape[0]), s=2, marker=".")
+    
+        for polyline in rawpolylines[z]:
+            axs[3].plot3D(polyline[:, 0], polyline[:, 1], z*np.ones(polyline.shape[0]), linewidth=1.5)
+    
+        for polyline in cleanpolylines[z]:
+            axs[4].plot3D(polyline[:, 0], polyline[:, 1], z*np.ones(polyline.shape[0]), linewidth=1.5)
+         
+        pgn = polygons[z]
+        try:
+            if len(pgn) > 1:
+                for geom in pgn:
+                    ext_x, ext_y = geom.exterior.xy
+                    axs[5].plot(ext_x, ext_y, z*np.ones(len(ext_x)), linewidth=3, c=clr[i])
+        except TypeError:
+            ext_x, ext_y = pgn.exterior.xy
+            axs[5].plot(ext_x, ext_y, z*np.ones(len(ext_x)), linewidth=3, c=clr[i])
+            if len(pgn.interiors) > 0:
+                for hole in pgn.interiors:
+                    int_x, int_y = hole.xy
+                    plt.plot(int_x, int_y, z*np.ones(len(int_x)), linewidth=3, c=clr[i])
+        if i == 4:
+            i = 0
+        else:
+            i += 1
+  
+    plt.show()
+            
+            
+            
 
