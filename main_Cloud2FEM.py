@@ -1,7 +1,6 @@
 import shelve
 import numpy as np
 from pyntcloud import PyntCloud
-import shapely
 import shapely.geometry as sg
 import sys
 from PyQt5 import QtWidgets
@@ -13,6 +12,7 @@ from pyqtgraph import PlotWidget
 
 from Vispy3DViewer import Visp3dplot
 import Cloud2Polygons as cp
+import Polygons2FEM as pf
 
 
 import ezdxf
@@ -295,224 +295,9 @@ def test_plotpolygons():
     plt.show()
 
 
-def make_mesh(xeldim, yeldim):
-    mct.xngrid = np.arange(mct.xmin - xeldim, mct.xmax + 2 * xeldim, xeldim)  # x node grid
-    mct.xelgrid = mct.xngrid[: -1] + xeldim / 2                               # x element grid
-    mct.yngrid = np.arange(mct.ymin - yeldim, mct.ymax + 2 * yeldim, yeldim)
-    mct.yelgrid = mct.yngrid[: -1] + yeldim / 2
-
-    # Selects the elements inside the Shapely MultiPolygons
-    # and returns a dict of np array whose lines represent an element=[xelgridID, yelgridID]
-    import time
-    t0 = time.time()
-    mct.elemlist = {}
-    for z in mct.zcoords:
-        initstack = 0
-        for x in range(len(mct.xelgrid)):
-            for y in range(len(mct.yelgrid)):
-                if mct.polygs[z].contains(sg.Point(mct.xelgrid[x], mct.yelgrid[y])):
-                    if initstack != 0:
-                        mct.elemlist[z] = np.vstack((mct.elemlist[z], np.array([x, y])))
-                    else:
-                        mct.elemlist[z] = np.array([[x, y]])
-                        initstack += 1
-    t1 = time.time()
-    t = t1 - t0
-    print('Shapely code, elapsed time: ', str(t))
-
-    # Creates the list of nodes and elements connectivity. Elements are extruded from the bottom to the top
-    t0 = time.time()
-
-    nodeID = 1              # Node ID
-    elID = 1                # Element ID
-    mct.nodelist = []
-    # mct.elconnect = []
-    elconnect = []
-    ignore = []  # Nodes to ignore when comparing
-    zignore = 0  # Nodes found in the current slice that will be ignored later
-
-    for z in range(len(mct.zcoords)):
-        crntz = mct.zcoords[z]              # Current z
-        print('GENERATING ELEMENTS FOR SLICE ', crntz)
-        if z != len(mct.zcoords) - 1:
-            elh = mct.zcoords[z+1] - crntz  # Elements height
-        else:
-            elh = crntz - mct.zcoords[z-1]  # Height of the elements of the last slice
-        abcde = np.array([[0, 1, 2, 3]]) ##################### TEST FOR VSTACK NEW NODES
-        z_elconnect = []  ################ TEST FOR VSTACK NEW ELEMENTS
-        c_info = 0
-        for elem in mct.elemlist[mct.zcoords[z]]:
-            # Print info message
-            c_info += 1
-            if c_info % 1000 == 0:
-                print('Zcoord: ', mct.zcoords[z], ', element', c_info, ' of ', mct.elemlist[mct.zcoords[z]].shape[0])
-            ###
-            tempel = [elID]
-            for node in range(8):  # Element node number 0 -> 7
-                if node == 0:
-                    tempn = [nodeID, mct.xngrid[elem[0]], mct.yngrid[elem[1]], crntz]
-                elif node == 1:
-                    tempn = [nodeID, mct.xngrid[elem[0] + 1], mct.yngrid[elem[1]], crntz]
-                elif node == 2:
-                    tempn = [nodeID, mct.xngrid[elem[0] + 1], mct.yngrid[elem[1] + 1], crntz]
-                elif node == 3:
-                    tempn = [nodeID, mct.xngrid[elem[0]], mct.yngrid[elem[1] + 1], crntz]
-                elif node == 4:
-                    tempn = [nodeID, mct.xngrid[elem[0]], mct.yngrid[elem[1]], crntz + elh]
-                elif node == 5:
-                    tempn = [nodeID, mct.xngrid[elem[0] + 1], mct.yngrid[elem[1]], crntz + elh]
-                elif node == 6:
-                    tempn = [nodeID, mct.xngrid[elem[0] + 1], mct.yngrid[elem[1] + 1], crntz + elh]
-                elif node == 7:
-                    tempn = [nodeID, mct.xngrid[elem[0]], mct.yngrid[elem[1] + 1], crntz + elh]
-
-                if elID != 1:
-                    if z > 2:
-                        ignoring = 1  # Comparing only with the nodes in the slice below
-                        nexistsxy = np.logical_and(tempn[1] == mct.nodelist[ignore[z-2]:, 1], tempn[2] == mct.nodelist[ignore[z-2]:, 2])
-                        nexists = np.where(np.logical_and(nexistsxy == True, tempn[3] == mct.nodelist[ignore[z-2]:, 3]))[0]
-                    elif z <= 2:
-                        ignoring = 0
-                        nexistsxy = np.logical_and(tempn[1] == mct.nodelist[:, 1], tempn[2] == mct.nodelist[:, 2])
-                        nexists = np.where(np.logical_and(nexistsxy == True, tempn[3] == mct.nodelist[:, 3]))[0]
-
-                    # Old and slower way to compare nodes ############################
-                    # nexistsxy = np.logical_and(tempn[1] == mct.nodelist[:, 1], tempn[2] == mct.nodelist[:, 2])
-                    # nexists = np.where(np.logical_and(nexistsxy == True, tempn[3] == mct.nodelist[:, 3]))[0]
-                    ##################################################################
-
-                    if len(nexists) == 1:
-                        if ignoring == 1:
-                            small_nodelist = mct.nodelist[ignore[z - 2]:]
-                            tempel.append(small_nodelist[nexists, 0][0])
-                        elif ignoring == 0:
-                            tempel.append(mct.nodelist[nexists, 0][0])
-                    else:
-                        mct.nodelist = np.vstack((mct.nodelist, tempn))
-                        tempel.append(nodeID)
-                        nodeID += 1
-                        zignore += 1
-
-                else:
-                    if nodeID == 1:
-                        mct.nodelist = np.array([tempn])
-                        tempel.append(nodeID)
-                        nodeID += 1
-                    else:
-                        mct.nodelist = np.vstack((mct.nodelist, tempn))
-                        tempel.append(nodeID)
-                        nodeID += 1
-
-            # Add new elements to z_elconnect
-            z_elconnect.append(tempel)
-            elID += 1
-
-            # Old and slower way of adding new elements ###############
-            # if elID != 1:
-            #     # Stack the new elements
-            #     mct.elconnect = np.vstack((mct.elconnect, tempel))
-            #     elID += 1
-            # else:
-            #     # Store the first element
-            #     mct.elconnect = np.array([tempel])
-            #     elID += 1
-            ###########################################################
-
-        # Add z_elconnect to the list that contains all the elements
-        elconnect += z_elconnect
-        ignore.append(zignore)
-
-    mct.elconnect = np.array(elconnect)
-    t1 = time.time()
-    t = t1 - t0
-    print('Connectivity generation, elapsed time: ', str(t))
-    print('Mesh Generated')
 
 
 
-
-
-# def exp_mesh_func():
-#     try:
-#         fd = QFileDialog()
-#         meshpath = fd.getSaveFileName(parent=None, caption="Export DXF", directory="", filter="Abaqus Input File (*.inp)")[0]
-#         f = open(meshpath, "w")
-#
-#         f.write("*Node\n")
-#         for node in mct.nodelist:
-#             nid = str(int(node[0]))
-#             nx = str("%.8f" % node[1])
-#             ny = str("%.8f" % node[2])
-#             nz = str("%.8f" % node[3])
-#             f.write("      " + nid + ",   " + nx + ",   " + ny + ",   " + nz + "\n")
-#
-#         f.write("*Element, type=C3D4\n")
-#         T4_LCO = ff.H8_to_T4_elements(mct.elconnect[:, 1:], 1)
-#         for i in range(T4_LCO.shape[0]):
-#             eid = str(i+1)
-#             n1 = str(int(T4_LCO[i, 0]))
-#             n2 = str(int(T4_LCO[i, 1]))
-#             n3 = str(int(T4_LCO[i, 2]))
-#             n4 = str(int(T4_LCO[i, 3]))
-#             f.write(eid + ", " + n1 + ", " + n2 + ", " + n3 + ", "
-#                     + n4 + "\n")
-#         f.close()
-#
-#         msg_dxfok = QMessageBox()
-#         msg_dxfok.setWindowTitle('Mesh Export')
-#         msg_dxfok.setText('File saved in: \n' + meshpath + '                       ')
-#         x = msg_dxfok.exec_()
-#
-#     except (ValueError, TypeError, FileNotFoundError):
-#         print('No .inp name specified')
-
-
-
-def exp_mesh_func():
-    try:
-        fd = QFileDialog()
-        meshpath = fd.getSaveFileName(parent=None, caption="Export DXF", directory="", filter="Abaqus Input File (*.inp)")[0]
-        f = open(meshpath, "w")
-
-        f.write("*Heading\n** Generated by: Python Cloud2FEM\n")
-        f.write("**\n** PARTS\n**\n*Part, name=PART-1\n")
-
-        f.write("*Node\n")
-        for node in mct.nodelist:
-            nid = str(int(node[0]))
-            nx = str("%.8f" % node[1])
-            ny = str("%.8f" % node[2])
-            nz = str("%.8f" % node[3])
-            f.write("      " + nid + ",   " + nx + ",   " + ny + ",   " + nz + "\n")
-
-        f.write("*Element, type=C3D8\n")
-        for elem in mct.elconnect:
-            eid = str(int(elem[0]))
-            n1 = str(int(elem[1]))
-            n2 = str(int(elem[2]))
-            n3 = str(int(elem[3]))
-            n4 = str(int(elem[4]))
-            n5 = str(int(elem[5]))
-            n6 = str(int(elem[6]))
-            n7 = str(int(elem[7]))
-            n8 = str(int(elem[8]))
-            f.write(eid + ", " + n1 + ", " + n2 + ", " + n3 + ", "
-                    + n4 + ", " + n5 + ", " + n6 + ", " + n7 + ", " + n8 + "\n")
-
-        f.write("*End Part\n")
-        f.write("**\n**\n** ASSEMBLY\n**\n*Assembly, name=Assembly\n")
-        f.write("**\n*Instance, name=WHOLE_MODEL, part=PART-1\n*End Instance\n")
-        f.write("**\n*End Assembly\n")
-
-        f.close()
-
-        msg_dxfok = QMessageBox()
-        msg_dxfok.setWindowTitle('Mesh Export')
-        msg_dxfok.setText('File saved in: \n' + meshpath + '                       ')
-        x = msg_dxfok.exec_()
-
-    except (ValueError, TypeError, FileNotFoundError):
-        print('No .inp name specified')
 
 
 class Window(QMainWindow):
@@ -529,7 +314,7 @@ class Window(QMainWindow):
         self.save_project.triggered.connect(save_project)
         self.open_project.triggered.connect(open_project)
         self.exp_dxf.triggered.connect(exp_dxf)
-        self.exp_mesh.triggered.connect(exp_mesh_func)
+        self.exp_mesh.triggered.connect(self.exp_mesh_clicked)
         self.btn_3dview.clicked.connect(self.open3dview)
 
         self.rbtn_fixnum.toggled.connect(self.fixnum_toggled)
@@ -706,7 +491,12 @@ class Window(QMainWindow):
         # mct.elemlist, mct.nodelist, mct.elconnect = make_mesh(
         #     xeldim, yeldim, mct.xmin, mct.ymin, mct.xmax, mct.ymax, mct.zcoords, mct.polygs)
         #######################################################################
-        make_mesh(xeldim, yeldim)
+
+        # make_mesh(xeldim, yeldim)
+        
+        mct.elemlist, mct.nodelist, mct.elconnect = pf.make_mesh(
+            xeldim, yeldim, mct.xmin, mct.ymin, mct.xmax, mct.ymax, mct.zcoords, mct.polygs)
+        
         self.check_mesh.setEnabled(True)
         self.main2dplot()
         self.exp_mesh.setEnabled(True)
@@ -716,6 +506,18 @@ class Window(QMainWindow):
         msg_meshok.setText('\nMesh generation completed                 '
                             '\n                                         ')
         x = msg_meshok.exec_()
+    
+    def exp_mesh_clicked(self):
+        try:
+            fd = QFileDialog()
+            meshpath = fd.getSaveFileName(parent=None, caption="Export DXF", directory="", filter="Abaqus Input File (*.inp)")[0]
+            pf.export_mesh(meshpath, mct.nodelist, mct.elconnect)
+            msg_dxfok = QMessageBox()
+            msg_dxfok.setWindowTitle('Mesh Export')
+            msg_dxfok.setText('File saved in: \n' + meshpath + '                       ')
+            x = msg_dxfok.exec_()
+        except (ValueError, TypeError, FileNotFoundError):
+            print('No .inp name specified')
 
     def srule_status(self, torf):
         self.lineEdit_from.setEnabled(torf)

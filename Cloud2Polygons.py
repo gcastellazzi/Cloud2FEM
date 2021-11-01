@@ -2,7 +2,7 @@
 # This module contains all the functions that, given a point cloud, allow to
 # obtain a set of MultiPolygons at specified z coordinates.
 #
-# Run this file as __main__ to see an example
+# Run this file as __main__ to see an example.
 ###############################################################################
 
 
