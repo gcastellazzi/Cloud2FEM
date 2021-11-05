@@ -11,6 +11,9 @@ import numpy as np
 import shapely
 import shapely.geometry as sg
 
+import ezdxf
+from ezdxf.addons.geo import GeoProxy
+
 
 
 
@@ -289,6 +292,35 @@ def make_polygons(minwthick, zcoords, cleanpolys, tolsimpl=0.035):
             print('Index error in "temp = pgons[0]"')
             pass
     return polygs, invalidpolygons
+
+
+
+
+
+def export_dxf(zcoords, polygs, filepath):
+    """
+    This function saves a dxf file of hatches in the filepath.
+    Once in AutoCAD, polylines can be retrieved using the command
+    'hatchgenerateboudnary'
+    """
+    dxfdoc = ezdxf.new('R2013')
+    msp = dxfdoc.modelspace()
+
+    for z in zcoords:
+        pygeoint = sg.mapping(polygs[z])    # Or use asShape instead of mapping
+        dxfentities = GeoProxy.to_dxf_entities(GeoProxy.parse(pygeoint))
+        for entity in dxfentities:
+            entity.rgb = (0, 133, 147)
+            entity.transparency = (0.15)
+            msp.add_entity(entity.translate(0, 0, z))
+            
+    dxfdoc.saveas(filepath)
+
+
+
+
+
+
 
 
 

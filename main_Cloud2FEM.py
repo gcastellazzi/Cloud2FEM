@@ -15,8 +15,8 @@ import Cloud2Polygons as cp
 import Polygons2FEM as pf
 
 
-import ezdxf
-from ezdxf.addons.geo import GeoProxy
+# import ezdxf
+# from ezdxf.addons.geo import GeoProxy
 #import FEM_functions as ff
 
 
@@ -76,32 +76,18 @@ def save_project():
         filepath = fd.getSaveFileName(parent=None, caption="Save Project", directory="",
                                       filter="Cloud2FEM Data (*.cloud2fem)")[0]
         s = shelve.open(filepath)
-        s['npts'] = mct.npts
-        s['zmin'] = mct.zmin
-        s['zmax'] = mct.zmax
-        s['xmin'] = mct.xmin
-        s['xmax'] = mct.xmax
-        s['ymin'] = mct.ymin
-        s['ymax'] = mct.ymax
-        s['zcoords'] = mct.zcoords
-        s['slices'] = mct.slices
-        s['ctrds'] = mct.ctrds
-        s['polys'] = mct.polys
-        s['cleanpolys'] = mct.cleanpolys
-        s['polygs'] = mct.polygs
-        s['xngrid'] = mct.xngrid
-        s['xelgrid'] = mct.xelgrid
-        s['yngrid'] = mct.yngrid
-        s['yelgrid'] = mct.yelgrid
-        s['elemlist'] = mct.elemlist
-        s['nodelist'] = mct.nodelist
-        s['elconnect'] = mct.elconnect
+        mct_dict = mct.__dict__  # Special method: convert instance of a class to a dict
+        for k in mct_dict.keys():
+            if k in ['filepath', 'pcl', 'netpcl', 'editmode', 'roiIndex', 
+                     'temp_roi_plot', 'temp_polylines', 'temp_scatter', 'temp_points']:
+                continue
+            else:
+                s[k] = mct_dict[k]
         s.close()
     except (ValueError, TypeError, FileNotFoundError):
         print('No file name specified')
 
 def open_project():
-
         try:
             fd = QFileDialog()
             filepath = fd.getOpenFileName(parent=None, caption="Open Project", directory="",
@@ -118,7 +104,7 @@ def open_project():
             mct.zcoords = s['zcoords']
             mct.slices = s['slices']
             mct.ctrds = s['ctrds']
-            #mct.polys = s['polys']
+            mct.polys = s['polys']
             mct.cleanpolys = s['cleanpolys']
             mct.polygs = s['polygs']
             mct.xngrid = s['xngrid']
@@ -245,35 +231,6 @@ def loadpcl():
 
 
 
-
-def exp_dxf():
-        try:
-            fd = QFileDialog()
-            dxfpath = fd.getSaveFileName(parent=None, caption="Export DXF", directory="", filter="DXF (*.dxf)")[0]
-
-            dxfdoc = ezdxf.new('R2013')
-            msp = dxfdoc.modelspace()
-
-            for z in mct.zcoords:
-                pygeoint = sg.mapping(mct.polygs[z])    # oppure asShape al posto di mapping
-                dxfentities = GeoProxy.to_dxf_entities(GeoProxy.parse(pygeoint))
-                for entity in dxfentities:
-                    entity.rgb = (0, 133, 147)
-                    entity.transparency = (0.15)
-                    msp.add_entity(entity.translate(0, 0, z))
-
-            dxfdoc.saveas(dxfpath)
-
-            msg_dxfok = QMessageBox()
-            msg_dxfok.setWindowTitle('DXF Export')
-            msg_dxfok.setText('File saved in: \n' + dxfpath + '                       ')
-            x = msg_dxfok.exec_()
-
-        except (ValueError, TypeError, FileNotFoundError):
-            print('No dxf name specified')
-
-
-
 def test_plotpolygons():
     """ #############################################################
     Metodo temporaneo per plottare i MultiPolygons generati
@@ -313,7 +270,7 @@ class Window(QMainWindow):
         self.Load_PC.triggered.connect(loadpcl)
         self.save_project.triggered.connect(save_project)
         self.open_project.triggered.connect(open_project)
-        self.exp_dxf.triggered.connect(exp_dxf)
+        self.exp_dxf.triggered.connect(self.exp_dxf_clicked)
         self.exp_mesh.triggered.connect(self.exp_mesh_clicked)
         self.btn_3dview.clicked.connect(self.open3dview)
 
@@ -482,18 +439,23 @@ class Window(QMainWindow):
         msg_polygsok.setText('\nPolygons generation completed           '
                             '\n                                         ')
         x = msg_polygsok.exec_()
-
+        
+    def exp_dxf_clicked(self):
+        try:
+            fd = QFileDialog()
+            filepath = fd.getSaveFileName(parent=None, caption="Export DXF", directory="", filter="DXF (*.dxf)")[0]
+            cp.export_dxf(mct.zcoords, mct.polygs, filepath)
+            msg_dxfok = QMessageBox()
+            msg_dxfok.setWindowTitle('DXF Export')
+            msg_dxfok.setText('File saved in: \n' + filepath + '                       ')
+            x = msg_dxfok.exec_()
+        except (ValueError, TypeError, FileNotFoundError):
+            print('No dxf name specified')
+        
     def genmesh_clicked(self):
         xeldim = float(self.lineEdit_xeldim.text())
         yeldim = float(self.lineEdit_yeldim.text())
-        ############## Cython TEST ############################################
-        # from make_mesh_func import make_mesh
-        # mct.elemlist, mct.nodelist, mct.elconnect = make_mesh(
-        #     xeldim, yeldim, mct.xmin, mct.ymin, mct.xmax, mct.ymax, mct.zcoords, mct.polygs)
-        #######################################################################
 
-        # make_mesh(xeldim, yeldim)
-        
         mct.elemlist, mct.nodelist, mct.elconnect = pf.make_mesh(
             xeldim, yeldim, mct.xmin, mct.ymin, mct.xmax, mct.ymax, mct.zcoords, mct.polygs)
         
@@ -589,17 +551,17 @@ class Window(QMainWindow):
     def plot_polylines(self):
         for poly in mct.polys[mct.zcoords[self.combo_slices.currentIndex()]]:
             # self.plot2d.plot(poly, pen=pg.mkPen(color='b', width=2))
-            colr = np.random.randint(120, 255)
-            colg = np.random.randint(1, 5)
-            colb = np.random.randint(1, 5)
+            # colr = np.random.randint(120, 255)
+            # colg = np.random.randint(1, 5)
+            # colb = np.random.randint(1, 5)
             # self.plot2d.plot(poly[:, : 2], pen=pg.mkPen(color=(colr, colg, colb, 255), width=3))
             self.plot2d.plot(poly[:, : 2], pen=pg.mkPen(color=(0, 0, 255, 255), width=3))   ################### default width = 3
 
     def plot_polys_clean(self):
         for poly in mct.cleanpolys[mct.zcoords[self.combo_slices.currentIndex()]]:
-            colr = np.random.randint(1, 5)
-            colg = np.random.randint(1, 5)
-            colb = np.random.randint(120, 255)
+            # colr = np.random.randint(1, 5)
+            # colg = np.random.randint(1, 5)
+            # colb = np.random.randint(120, 255)
             # self.plot2d.plot(poly[:, : 2], pen=pg.mkPen(color=(colr, colg, colb, 255), width=3))
             self.plot2d.plot(poly[:, : 2], pen=pg.mkPen(color=(0, 0, 0, 255), width=5))   ###### default width = 5
 
