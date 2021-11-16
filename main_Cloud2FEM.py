@@ -556,7 +556,7 @@ class Window(QMainWindow):
             # colb = np.random.randint(1, 5)
             # self.plot2d.plot(poly[:, : 2], pen=pg.mkPen(color=(colr, colg, colb, 255), width=3))
             self.plot2d.plot(poly[:, : 2], pen=pg.mkPen(color=(0, 0, 255, 255), width=3))   ################### default width = 3
-
+            
     def plot_polys_clean(self):
         for poly in mct.cleanpolys[mct.zcoords[self.combo_slices.currentIndex()]]:
             # colr = np.random.randint(1, 5)
@@ -564,7 +564,11 @@ class Window(QMainWindow):
             # colb = np.random.randint(120, 255)
             # self.plot2d.plot(poly[:, : 2], pen=pg.mkPen(color=(colr, colg, colb, 255), width=3))
             self.plot2d.plot(poly[:, : 2], pen=pg.mkPen(color=(0, 0, 0, 255), width=5))   ###### default width = 5
-
+            pts = pg.ScatterPlotItem(pos=poly[:, : 2], size=9, brush=pg.mkBrush(255, 0, 0, 255), symbol='s')
+            self.plot2d.addItem(pts)
+            
+            
+            
     def main2dplot(self):
         chk2dsli = self.check_2d_slice.isChecked()
         chk2centr = self.check_2d_centr.isChecked()
