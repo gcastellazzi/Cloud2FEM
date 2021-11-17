@@ -67,17 +67,20 @@ class RemovePointsClick:
     Class that handles data and signals to remove points by clicking on them.
     See example 1 at the bottom of this module.
     """
-    def __init__(self, pts_b, PlotItem, verbose=False):
+    def __init__(self, pts_b, PlotItem, psz, pclr=(90, 0, 0, 255), hclr='g', verbose=False):
         self.pts_b = pts_b       # np array of points before (_b) the click event
         self.PlotItem = PlotItem # pyqtgraph plot item
+        self.psz = psz           # Size of points
+        self.pclr = pclr         # Color of the points
+        self.hclr = hclr         # Color or the hover
         self.verbose = verbose   # If True, plots the emptying pts_b at every click
         
-    def remove_points(self, plot, points, ev):
+    def __remove_points_click(self, plot, points, ev):
         """
         plot, points and ev are automatically assigned when the function is 
-        called from a signal_connect like sigClicked.connect(remove_points)
+        called from a signal_connect like sigClicked.connect(__remove_points_click)
         points       : list of points that have been clicked
-        This function removes the clicked points from a given array pts_b
+        This private method removes the clicked points from a given array pts_b
         """
         for p in points:
             x_p = tuple(p.pos())[0]  # x coord of the clicked point
@@ -90,25 +93,135 @@ class RemovePointsClick:
         
     def start(self):
         """
-        When called, this function first creates a ScatterItem with the points
+        When called, this method first creates a ScatterItem with the points
         at the initial state, then adds the ScatterItem to the PlotItem and
         finally connects the "signal emitted when a point is clicked" to the
-        function remove_points()
+        private method __remove_points_click()
         """
         self.ScatterItem = pg.ScatterPlotItem(
-            pxMode=True,
-            size=20,
+            pxMode=True,  # Set pxMode=False to allow points to transform with the view
+            size=self.psz,
+            brush= pg.mkBrush(self.pclr),
             hoverable=True,
-            hoverPen=pg.mkPen('g', width=3),
-            hoverSize=30)
+            hoverPen=pg.mkPen(self.hclr, width=self.psz/15),
+            hoverSize=self.psz*1.3)
         self.ScatterItem.addPoints(self.pts_b[:, 0], self.pts_b[:, 1])
         self.PlotItem.addItem(self.ScatterItem)
-        self.ScatterItem.sigClicked.connect(self.remove_points)
+        self.ScatterItem.sigClicked.connect(self.__remove_points_click)
     
     def stop(self):
-        """ If called, this function disables the removal of points"""
-        self.ScatterItem.sigClicked.disconnect(self.remove_points)
+        """ If called, this method disables the removal of points"""
+        self.ScatterItem.sigClicked.disconnect(self.__remove_points_click)
+
+
+
+class RemovePointsRect:
+    """
+    Class that handles data and signals to remove points by selecting
+    them with a rectangular shape. See example 2 at the bottom of this module.
+    """
+    def __init__(self, pts_b, PlotItem, psz, pclr=(90, 0, 0, 255), sclr=(255, 100, 0, 45), verbose=False):
+        self.pts_b = pts_b       # np array of points before (_b) the click event
+        self.PlotItem = PlotItem # pyqtgraph plot item
+        self.psz = psz           # Size of points
+        self.pclr = pclr         # Color of the points
+        self.sclr = sclr         # Color or the selection
+        self.verbose = verbose   # If True, plots the emptying pts_b at every click
+        
+    def __remove_points_rect(self, event):
+        """ This method removes the points inside a rectangle defined by two
+        opposite vertices, i.e. the first and the second click.
+        Event is given automatically from the sigMouseClicked signal
+        """
+        pos = event.scenePos()
+        if self.click == 0:  # So this is the first click signal
+            self.pos_click1 = self.PlotItem.vb.mapSceneToView(pos)  # Here I fix the coords of click1
+            self.click = 1   # see start function for the meaning
+            if self.verbose:
+                print('First click: ', (self.pos_click1.x(), self.pos_click1.y()))
+        
+        elif self.click == 1:  # So this is the second click
+            pos_click2 = self.PlotItem.vb.mapSceneToView(pos)
+            # Remove selected points
+            toremove_x = np.logical_and(self.pts_b[:, 0] >= min(self.pos_click1.x(), pos_click2.x()), self.pts_b[:, 0] <= max(self.pos_click1.x(), pos_click2.x()))
+            toremove_y = np.logical_and(self.pts_b[:, 1] >= min(self.pos_click1.y(), pos_click2.y()), self.pts_b[:, 1] <= max(self.pos_click1.y(), pos_click2.y()))
+            toremove = np.where(np.logical_and(toremove_x, toremove_y))
+            self.pts_b = np.delete(self.pts_b, toremove, 0)
+            # Refresh plot
+            self.ScatterItem.clear()
+            self.ScatterItem.addPoints(self.pts_b[:, 0], self.pts_b[:, 1])
+            self.temp_rect.setData(self.rectx, self.recty)
+            self.line.setData(self.linex, self.liney)
+            # Reset default values for counters
+            self.click = 0
+            self.pos_click1 = None
+            if self.verbose:
+                print('Second click: ', (pos_click2.x(), pos_click2.y()))
+                print("Remaining points:\n", self.pts_b)
     
+    def __draw_temp_rect(self, event):
+        """ This method plots a transparent selection rectangle, AutoCAD style.
+        """
+        if self.pos_click1!= None and self.click == 1:
+            pos = event  # The position for sigMouseMoved is already in Scene Coordinates
+            mpos = self.PlotItem.vb.mapSceneToView(pos)  # Where the mouse is after the first click ... moving
+            # Update first three sides of the rectangle
+            rectx = [self.pos_click1.x(), mpos.x(), mpos.x(), self.pos_click1.x()]
+            recty = [self.pos_click1.y(), self.pos_click1.y(), mpos.y(), mpos.y()]
+            self.temp_rect.setData(rectx, recty)
+            # Update closing line of the rectangle
+            linex = [self.pos_click1.x(), self.pos_click1.x()]
+            liney = [self.pos_click1.y(), mpos.y()]
+            self.line.setData(linex, liney)
+            
+    def start(self):
+        """ When called, this method plots the initial points, then plots
+        a small (to hide it) rectangle and finally connects mouse signals
+        to the private methods above.
+        """
+        # Plot points
+        self.ScatterItem = pg.ScatterPlotItem(pxMode=True, size=self.psz, brush= pg.mkBrush(self.pclr))
+        self.ScatterItem.addPoints(self.pts_b[:, 0], self.pts_b[:, 1])
+        self.PlotItem.addItem(self.ScatterItem)
+        # Create the first three sides of the rectangle
+        xfactor = self.pts_b[:, 0].mean().item()
+        yfactor = self.pts_b[:, 1].mean().item()       
+        self.temp_rect = pg.PlotCurveItem()
+        dim = 1e-5 # Make the rectangle small to hide it
+        self.rectx = np.array([0, dim, dim, 0]) + xfactor
+        self.recty = np.array([0, 0, dim, dim]) + yfactor
+        self.temp_rect.setData(self.rectx, self.recty)
+        self.PlotItem.addItem(self.temp_rect)
+        # Create the closing side of the rectangle
+        self.line = pg.PlotCurveItem()
+        self.linex = np.array([0, 0]) + xfactor
+        self.liney = np.array([0, dim]) + yfactor
+        self.line.setData(self.linex, self.liney)
+        self.PlotItem.addItem(self.line)
+        fill = pg.FillBetweenItem(self.temp_rect, self.line, brush=pg.mkBrush(self.sclr))
+        self.PlotItem.addItem(fill)
+        # Set default values of counters
+        self.pos_click1 = None   # Coords of the first click
+        self.click = 0           # If=0 no click has been done, if=1 the first click has been done
+        # Connect signals
+        self.PlotItem.scene().sigMouseMoved.connect(self.__draw_temp_rect)
+        self.PlotItem.scene().sigMouseClicked.connect(self.__remove_points_rect)
+    
+    def stop(self):
+        """ If called, this method disables the removal of points 
+            through rectangular selection"""
+        self.PlotItem.scene().sigMouseMoved.disconnect(self.__draw_temp_rect)
+        self.PlotItem.scene().sigMouseClicked.disconnect(self.__remove_points_rect)
+        
+                
+        
+        
+        
+        
+        
+        
+        
+        
     
 
 ##############################################################################
@@ -117,11 +230,11 @@ class RemovePointsClick:
 if __name__ == "__main__":
     # Choose which mouse interaction example you want to see!
     # 1: Remove points with a click or with a rectangular selection
-    # 2: To do...
+    # 2: Remove points selected with a rectangular shape
     # 3: To do...
     # 4: To do...
     # 5: To do...
-    example = 1
+    example = 2
     
     from pyqtgraph.Qt import QtGui
 
@@ -133,12 +246,15 @@ if __name__ == "__main__":
     
     points = np.array([[0, 0], [0, 1], [0, 2], [1, 0], [1, 1], [1, 2], [2, 0], [2, 1], [2, 2]]) * 10
     
-    if example == 1:       
-        ciao = RemovePointsClick(points, plot, verbose=True)
+    
+    if example == 1:
+        ciao = RemovePointsClick(points, plot, 20, verbose=True)
+        ciao.start()
+            
+    elif example == 2:
+        ciao = RemovePointsRect(points, plot, 20, verbose=True)
         ciao.start()
         
-    elif example == 2:
-        pass
     elif example == 3:
         pass
     elif example == 4:
