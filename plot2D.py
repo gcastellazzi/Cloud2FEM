@@ -28,6 +28,8 @@ def plot_grid(PlotItem, xdim, ydim, xmin, xmax, ymin, ymax):
         
 
 
+
+
 def plot_scatter(PlotItem, points, sz=5, clr=(0, 0, 0, 255)):
     """
     points : np.array([[x1, y1], [x2, y2], ..., [xn, yn]])
@@ -37,6 +39,8 @@ def plot_scatter(PlotItem, points, sz=5, clr=(0, 0, 0, 255)):
     """
     scatter2d = pg.ScatterPlotItem(pos=points, size=sz, brush=pg.mkBrush(clr))
     PlotItem.addItem(scatter2d)
+
+
 
 
 
@@ -59,6 +63,8 @@ def plot_polylines(PlotItem, polylines, wd=3, clr=(50, 50, 50, 255), rainbow=Fal
         if points == True:
             pts = pg.ScatterPlotItem(pos=poly[:, : 2], size=9, brush=pg.mkBrush(255, 0, 0, 255), symbol='s')
             PlotItem.addItem(pts)
+
+
 
 
 
@@ -88,8 +94,7 @@ class RemovePointsClick:
             self.pts_b = np.delete(self.pts_b, np.where(np.logical_and(x_p == self.pts_b[:, 0], y_p == self.pts_b[:, 1])), 0)
             if self.verbose:
                 print("Remaining points:\n", self.pts_b)
-        self.ScatterItem.clear()
-        self.ScatterItem.addPoints(self.pts_b[:, 0], self.pts_b[:, 1])
+        self.ScatterItem.setData(self.pts_b[:, 0], self.pts_b[:, 1])
         
     def start(self):
         """
@@ -111,6 +116,7 @@ class RemovePointsClick:
     
     def stop(self):
         """ If called, this method disables the removal of points"""
+
         self.ScatterItem.sigClicked.disconnect(self.__remove_points_click)
 
 
@@ -119,11 +125,15 @@ class RemovePointsRect:
     """
     Class that handles data and signals to remove points by selecting
     them with a rectangular shape. See example 2 at the bottom of this module.
+    If self.addline=True, a polyline is plotted together with the points.
     """
-    def __init__(self, pts_b, PlotItem, psz, pclr=(90, 0, 0, 255), sclr=(255, 100, 0, 45), verbose=False):
-        self.pts_b = pts_b       # np array of points before (_b) the click event
+    def __init__(self, pts_b, PlotItem, psz, addline=False, lwdth=3, lclr=(0, 100, 200, 255), pclr=(90, 0, 0, 255), sclr=(255, 100, 0, 45), verbose=False):
+        self.pts_b = pts_b       # np array of points before (_b) the click event, or a polyline
         self.PlotItem = PlotItem # pyqtgraph plot item
         self.psz = psz           # Size of points
+        self.addline = addline   # Bool to plot a polyline that connects the points
+        self.lwdth = lwdth       # Width of the polyline
+        self.lclr = lclr         # Color or the polyline
         self.pclr = pclr         # Color of the points
         self.sclr = sclr         # Color or the selection
         self.verbose = verbose   # If True, plots the emptying pts_b at every click
@@ -148,8 +158,12 @@ class RemovePointsRect:
             toremove = np.where(np.logical_and(toremove_x, toremove_y))
             self.pts_b = np.delete(self.pts_b, toremove, 0)
             # Refresh plot
-            self.ScatterItem.clear()
-            self.ScatterItem.addPoints(self.pts_b[:, 0], self.pts_b[:, 1])
+            self.ScatterItem.setData(self.pts_b[:, 0], self.pts_b[:, 1])
+            
+            # Update scatter plot and polyline plot
+            if self.addline:
+                self.CurveItem.setData(self.pts_b[:, 0], self.pts_b[:, 1])
+            
             self.temp_rect.setData(self.rectx, self.recty)
             self.line.setData(self.linex, self.liney)
             # Reset default values for counters
@@ -179,6 +193,15 @@ class RemovePointsRect:
         a small (to hide it) rectangle and finally connects mouse signals
         to the private methods above.
         """
+        # Create a plotcurve item
+        if self.addline:
+            self.CurveItem = pg.PlotCurveItem(
+                width=self.lwdth,
+                pen=pg.mkPen(color=self.lclr))
+            self.CurveItem.setData(self.pts_b[:, 0], self.pts_b[:, 1])
+            self.PlotItem.addItem(self.CurveItem)
+        
+        
         # Plot points
         self.ScatterItem = pg.ScatterPlotItem(pxMode=True, size=self.psz, brush= pg.mkBrush(self.pclr))
         self.ScatterItem.addPoints(self.pts_b[:, 0], self.pts_b[:, 1])
@@ -212,9 +235,155 @@ class RemovePointsRect:
             through rectangular selection"""
         self.PlotItem.scene().sigMouseMoved.disconnect(self.__draw_temp_rect)
         self.PlotItem.scene().sigMouseClicked.disconnect(self.__remove_points_rect)
-        
-                
-        
+
+
+
+
+
+class MovePoint:
+    """
+    Class that handles data and signals to modify a polyline by clicking on
+    a point and modifying its position, similarly to MovePoint class.
+    See example 3 at the bottom of this module.
+    """
+    def __init__(self, pll, PlotItem, psz, addline=False, lwdth=3, lclr=(0, 100, 200, 255), pclr=(90, 0, 0, 255), hclr='g', tclr=(0, 0, 250, 255), verbose=False):
+        self.pll = pll             # np array of points (or polilyne)
+        self.PlotItem = PlotItem    # pyqtgraph plot item
+        self.psz = psz              # Size of points
+        self.addline = addline      # Bool to plot a line that connects the points
+        self.lwdth = lwdth          # Line width
+        self.lclr = lclr            # Color of the line
+        self.pclr = pclr            # Color of the points
+        self.hclr = hclr            # Color or the hover
+        self.tclr = tclr            # Color of the temporary moving point
+        self.verbose = verbose      # If True, plots the changing pll after the action is completed
+    
+    def __init_moving_point(self, plot, points, ev):
+        """ plot, points and ev are automatically assigned when this private
+        method is called from the sigMouseClicked signal.
+        It finds the id of the clicked points, then creates a temporary list of
+        points with the clicked point removed and plots it. Also, the temp node
+        is plotted as well in self.TempPoint, but it will be updated by the 
+        __temp_point method.
+        """
+        if len(points) != 1: # Do nothing if two or more points have been clicked together
+            pass
+        else:
+            x_p = tuple(points[0].pos())[0]  # x coord of the clicked point
+            y_p = tuple(points[0].pos())[1]  # y coord of the clicked point
+            self.point_id = np.where(np.logical_and(x_p == self.pll[:, 0], y_p == self.pll[:, 1]))
+            temp_pts = np.delete(self.pll, np.where(np.logical_and(x_p == self.pll[:, 0], y_p == self.pll[:, 1])), 0)
+            self.ScatterItem.setData(temp_pts[:, 0], temp_pts[:, 1])
+            self.TempPoint.addPoints([x_p], [y_p])
+            self.temp_pt = np.array([x_p, y_p])
+            self.click = 1
+            self.conflict1 = True
+            # Connect signal for temporary point
+            self.PlotItem.scene().sigMouseMoved.connect(self.__temp_point)
+    
+    def __finalize_moving_point(self, event):
+        """The event parameter is automatically assigned by calling through the signal.
+        The position of the second click is obtained, then the point under the first
+        click is substituded by the position under the second click.
+        Finally the plot is updated and the mousemoved signal is disconnected.
+        If self.addline=True, the final shape of the polyline is set as well.
+        """
+        pos = event.scenePos()
+        if self.click == 0:  # So this is the first click signal
+            pass
+        elif self.click == 1:
+            pos_click2 = self.PlotItem.vb.mapSceneToView(pos)
+            x_p = pos_click2.x()
+            y_p = pos_click2.y()
+            # Handle the conflict that happens because with the first click
+            # a sigMouseClicked is sent together with scatter.sigClicked
+            tol = 1e-5
+            if np.absolute(x_p - self.temp_pt[0]) > tol and np.absolute(y_p - self.temp_pt[1]) > tol and self.conflict1==True:
+                self.conflict1 = False
+            else:
+                # Update np array with the final position of the moved point
+                self.pll[self.point_id[0][0]] = np.array([x_p, y_p])
+                if self.verbose:
+                    print(self.pll)
+                # Update scatter plot and polyline plot
+                self.ScatterItem.setData(self.pll[:, 0], self.pll[:, 1])
+                if self.addline:
+                    self.CurveItem.setData(self.pll[:, 0], self.pll[:, 1])
+                # Set default values and clear
+                self.click = 0
+                self.temp_pt = None
+                self.TempPoint.clear()
+                # Disconnect signal for temporary point
+                self.PlotItem.scene().sigMouseMoved.disconnect(self.__temp_point)
+    
+    def __temp_point(self, event):
+        """ After a first click has been registered, this private method plots 
+        a temporary moving point (point dragged by te mouse). The temp point 
+        disappears after the second click.
+        If self.addline=True, it also updates the polyline while the point is moving.
+        """
+        if self.click == 1:
+            pos = event  # The position for sigMouseMoved is already in Scene Coordinates
+            mpos = self.PlotItem.vb.mapSceneToView(pos)  # Where the mouse is after the first click ... moving
+            # Update the position of the temp moving point
+            self.TempPoint.setData([mpos.x()], [mpos.y()])
+            # Update the shape of the polyline
+            if self.addline:
+                temp_pll = self.pll
+                temp_pll[self.point_id[0][0]] = np.array([mpos.x(), mpos.y()])
+                self.CurveItem.setData(temp_pll[:, 0], temp_pll[:, 1])
+    
+    def start(self):
+        """ When called, this method plots the initial points throuth self.ScatterItem,
+        then initializes the pg.ScatterPlotItem for the temporary point, then 
+        assigns default value for useful variables and finally connects the signals to two
+        of the private methods above.
+        If self.addline=True, it also plots the polyline that connects the points.
+        """
+        # Create a plotcurve item
+        if self.addline:
+            self.CurveItem = pg.PlotCurveItem(
+                width=self.lwdth,
+                pen=pg.mkPen(color=self.lclr))
+            self.CurveItem.setData(self.pll[:, 0], self.pll[:, 1])
+            self.PlotItem.addItem(self.CurveItem)
+        # Create scatter item for static points
+        self.ScatterItem = pg.ScatterPlotItem(
+            pxMode=True,  # Set pxMode=False to allow points to transform with the view
+            size=self.psz,
+            brush= pg.mkBrush(self.pclr),
+            hoverable=True,
+            hoverPen=pg.mkPen(self.hclr, width=self.psz/15),
+            hoverSize=self.psz*1.3)
+        self.PlotItem.addItem(self.ScatterItem)
+        self.ScatterItem.addPoints(self.pll[:, 0], self.pll[:, 1])
+        # Create scatter item for the temp moving point
+        self.TempPoint = pg.ScatterPlotItem(
+            pxMode=True,  # Set pxMode=False to allow points to transform with the view
+            size=self.psz,
+            brush= pg.mkBrush(self.tclr),
+            hoverable=True,
+            hoverPen=pg.mkPen(self.hclr, width=self.psz/15),
+            hoverSize=self.psz*1.3)
+        self.PlotItem.addItem(self.TempPoint)
+        # Set default values for counters
+        self.temp_pt = None
+        self.click = 0
+        # Connect signals
+        self.ScatterItem.sigClicked.connect(self.__init_moving_point)
+        self.PlotItem.scene().sigMouseClicked.connect(self.__finalize_moving_point)
+    
+    def stop(self):
+        """ If called, this method disconnects all the signals """
+        self.ScatterItem.sigClicked.disconnect(self.__init_moving_point)
+        self.PlotItem.scene().sigMouseClicked.disconnect(self.__finalize_moving_point)
+        try:
+            self.PlotItem.scene().sigMouseMoved.disconnect(self.__temp_point)
+        except TypeError:
+            if self.verbose:
+                print('sigMouseMoved was already disconnected... all good!')
+
+    
         
         
         
@@ -223,18 +392,19 @@ class RemovePointsRect:
         
         
     
-
+##############################################################################
 ##############################################################################
 ##################################################################### EXAMPLES
 ##############################################################################    
+##############################################################################
 if __name__ == "__main__":
     # Choose which mouse interaction example you want to see!
     # 1: Remove points with a click or with a rectangular selection
     # 2: Remove points selected with a rectangular shape
-    # 3: To do...
+    # 3: Move a point: click1 start dragging, click2 stop dragging
     # 4: To do...
     # 5: To do...
-    example = 2
+    example = 3
     
     from pyqtgraph.Qt import QtGui
 
@@ -244,21 +414,42 @@ if __name__ == "__main__":
     plot = view.addPlot()
     plot.setAspectLocked(True)
     
-    points = np.array([[0, 0], [0, 1], [0, 2], [1, 0], [1, 1], [1, 2], [2, 0], [2, 1], [2, 2]]) * 10
+    points = np.array([[0, 0], [0, 1], [0, 2], [1, 0], [1, 1], [1, 2], [2, 0], [2, 1], [2, 2]]).astype(dtype=np.float32, copy=False) * 10
+    polyline1 = np.array([[0, 0], [5, 1], [10, 5], [15, 3], [20, 10], [25, 7], [30, 7], [35, 15], [40, 9]]).astype(dtype=np.float32, copy=False)
+    polyline2 = polyline1 + 30
+    polyline3 = polyline2 + 20
     
     
     if example == 1:
-        ciao = RemovePointsClick(points, plot, 20, verbose=True)
-        ciao.start()
+        instance1 = RemovePointsClick(points, plot, 15, verbose=True)
+        instance1.start()
+        
+        instance2 = RemovePointsClick(polyline1, plot, 15, pclr=(0,0,90,255), verbose=True)
+        instance2.start()
             
     elif example == 2:
-        ciao = RemovePointsRect(points, plot, 20, verbose=True)
-        ciao.start()
+        instance1 = RemovePointsRect(points, plot, 15, addline=True, verbose=True)
+        instance1.start()
+        
+        instance2 = RemovePointsRect(polyline2, plot, 15, pclr=(0,0,90,255), addline=True, verbose=True)
+        instance2.start()
+        
+        instance3 = RemovePointsRect(polyline3, plot, 15, pclr=(0,100,90,255), verbose=True)
+        instance3.start()
         
     elif example == 3:
-        pass
+        instance1 = MovePoint(points, plot, 15, pclr=(150,0,150,255), verbose=True, addline=True)
+        instance1.start()
+        
+        instance2 = MovePoint(polyline2, plot, 15, verbose=True)
+        instance2.start()
+        
+        instance3 = MovePoint(polyline3, plot, 15, lclr=(0,200,10,255), pclr=(200,200,0,255), verbose=True, addline=True)
+        instance3.start()
+        
     elif example == 4:
         pass
+        
     elif example == 5:
         pass
     
