@@ -197,7 +197,7 @@ class RemovePointsRect:
         if self.addline:
             self.CurveItem = pg.PlotCurveItem(
                 width=self.lwdth,
-                pen=pg.mkPen(color=self.lclr))
+                pen=pg.mkPen(color=self.lclr, width=self.lwdth))
             self.CurveItem.setData(self.pts_b[:, 0], self.pts_b[:, 1])
             self.PlotItem.addItem(self.CurveItem)
         
@@ -344,7 +344,7 @@ class MovePoint:
         if self.addline:
             self.CurveItem = pg.PlotCurveItem(
                 width=self.lwdth,
-                pen=pg.mkPen(color=self.lclr))
+                pen=pg.mkPen(color=self.lclr, width=self.lwdth))
             self.CurveItem.setData(self.pll[:, 0], self.pll[:, 1])
             self.PlotItem.addItem(self.CurveItem)
         # Create scatter item for static points
@@ -383,15 +383,90 @@ class MovePoint:
             if self.verbose:
                 print('sigMouseMoved was already disconnected... all good!')
 
+
+
+
+
+class AddPointOnLine:
+    """
+    Class that handles data and signals to add a point in a polyline
+    See example 4 at the bottom of this module.
+    """
+    def __init__(self, view, pll, PlotItem, psz, lwdth=5, lclr=(0, 100, 200, 255), pclr=(90, 0, 0, 255), hclr='g', hlclr=(0, 0, 250, 255), verbose=False):
+        self.view = view
+        self.pll = pll              # np array of points (or polilyne)
+        self.PlotItem = PlotItem    # pyqtgraph plot item
+        self.psz = psz              # Size of points
+        self.lwdth = lwdth          # Line width
+        self.lclr = lclr            # Color of the line
+        self.pclr = pclr            # Color of the points
+        self.hclr = hclr            # Color or the hover
+        self.hlclr = hlclr          # Color of the line when the mouse is on it (hover)
+        self.verbose = verbose      # If True, plots the changing pll after the action is completed
     
+    def changecolor(self,ev):
+        # event[0].isEnter()
+        # self.segments[0].isEnter()
+        # print(items[0].listDataItems(), '\n')
+        # items[0].setBrush((100, 0, 0, 255))
+        # print(self.segments[0].isEnter())
+        print(ev)
+        # print(len(items))
+        # print(type(items[0]))
+        # print(type(items[1]))
+        # self.view.sigMouseHover.disconnect(self.changecolor)
         
         
+    def start(self):
+        """ ................
+        """
+        # Create a plotcurve item for every segment of the polyline
+        self.segments = []
+        for i in range(self.pll.shape[0]-1):
+            x = np.array([self.pll[i, 0], self.pll[i+1, 0]])
+            y = np.array([self.pll[i, 1], self.pll[i+1, 1]])
+            CurveItem = pg.PlotCurveItem(
+            pen=pg.mkPen(color=self.lclr, width=self.lwdth),
+            clickable=True)
+            # CurveItem.setClickable(None, width=100)
+            CurveItem.setData(x, y)
+            # CurveItem.setClickable(True, width=4)
+            self.PlotItem.addItem(CurveItem)
+            self.segments.append(CurveItem)
         
         
+        # self.ScatterItem = pg.ScatterPlotItem(
+        #     pxMode=True,  # Set pxMode=False to allow points to transform with the view
+        #     size=self.psz,
+        #     brush= pg.mkBrush(self.pclr),
+        #     hoverable=True,
+        #     hoverPen=pg.mkPen(self.hclr, width=self.psz/15),
+        #     hoverSize=self.psz*1.3)
+        # self.PlotItem.addItem(self.ScatterItem)
+        # self.ScatterItem.addPoints(self.pll[:, 0], self.pll[:, 1])
+
+        # print(self.segments)
+        # self.view.scene().sigMouseMoved.connect(self.changecolor)
         
+        for i in self.segments:
+            i.sigClicked.connect(self.changecolor)
+            
+        # self.PlotItem.scene().sigMouseHover.connect(self.changecolor)
+        # self.PlotItem.scene().mouseEvents
+        # self.PlotItem.scene().sigMouseHover
         
-        
-    
+
+
+
+
+
+
+
+
+
+
+
+
 ##############################################################################
 ##############################################################################
 ##################################################################### EXAMPLES
@@ -448,7 +523,9 @@ if __name__ == "__main__":
         instance3.start()
         
     elif example == 4:
-        pass
+        instance1 = AddPointOnLine(view, points, plot, 15)
+        instance1.start()
+        # print(plot.listDataItems())
         
     elif example == 5:
         pass
