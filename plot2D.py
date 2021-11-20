@@ -387,13 +387,131 @@ class MovePoint:
 
 
 
+# class AddPointOnLine_backup:
+#     """
+#     Class that handles data and signals to add a point in a polyline
+#     See example 4 at the bottom of this module.
+#     """
+#     def __init__(self, view, pll, PlotItem, psz, lwdth=5, lclr=(0, 100, 200, 255), pclr=(90, 0, 0, 255), hclr='g', hlclr=(0, 0, 250, 255), verbose=False):
+#         self.view = view
+#         self.pll = pll              # np array of points (or polilyne)
+#         self.PlotItem = PlotItem    # pyqtgraph plot item
+#         self.psz = psz              # Size of points
+#         self.lwdth = lwdth          # Line width
+#         self.lclr = lclr            # Color of the line
+#         self.pclr = pclr            # Color of the points
+#         self.hclr = hclr            # Color or the hover
+#         self.hlclr = hlclr          # Color of the line when the mouse is on it (hover)
+#         self.verbose = verbose      # If True, plots the changing pll after the action is completed
+    
+#     def changecolor(self, event):
+#         # event[0].isEnter()
+#         # self.segments[0].isEnter()
+#         # print(items[0].listDataItems(), '\n')
+#         # items[0].setBrush((100, 0, 0, 255))
+#         # print(self.segments[0].isEnter())
+#         # print(ev.isEnter())
+#         # print(len(items))
+#         # print(type(items[0]))
+#         # print(type(items[1]))
+#         # # print(items[0].lastScreenPos())
+#         # print("\n\n\n", type(items[0]))
+#         # print(items)
+      
+#         # print(items[0].isEnter())
+        
+#         # self.view.sigMouseHover.disconnect(self.changecolor)
+#         # self.PlotItem.scene().itemsNearEvent(ev)
+#         # self.PlotItem.lastScenePos()
+#         # mpos = self.PlotItem.vb.mapSceneToView(pos)
+#         # print(mpos)
+#         # print(self.PlotItem.hoverEvent(self.hev))
+        
+#         # # Click event works
+#         # pos = event.scenePos()
+#         # click = self.PlotItem.vb.mapSceneToView(pos)
+#         # print(self.polyline.mouseShape().contains(click))
+#         # ###########
+        
+#         pos = event
+#         mpos = self.PlotItem.vb.mapSceneToView(pos)
+#         print(self.polyline.mouseShape().contains(mpos))
+        
+#     def start(self):
+#         """ ................
+#         """
+#         # Create a plotcurve item for every segment of the polyline
+#         self.segments = []
+#         # for i in range(self.pll.shape[0]-1):
+#         #     x = np.array([self.pll[i, 0], self.pll[i+1, 0]])
+#         #     y = np.array([self.pll[i, 1], self.pll[i+1, 1]])
+#         #     CurveItem = pg.PlotCurveItem(
+#         #     pen=pg.mkPen(color=self.lclr, width=self.lwdth),
+#         #     clickable=True,
+#         #     parent=self.PlotItem)
+#         #     # CurveItem.setClickable(None, width=100)
+#         #     CurveItem.setData(x, y)
+#         #     # CurveItem.setClickable(True, width=4)
+#         #     self.PlotItem.addItem(CurveItem)
+#         #     self.segments.append(CurveItem)
+        
+        
+#         # self.ScatterItem = pg.ScatterPlotItem(
+#         #     pxMode=True,  # Set pxMode=False to allow points to transform with the view
+#         #     size=self.psz,
+#         #     brush= pg.mkBrush(self.pclr),
+#         #     hoverable=True,
+#         #     hoverPen=pg.mkPen(self.hclr, width=self.psz/15),
+#         #     hoverSize=self.psz*1.3)
+#         # self.PlotItem.addItem(self.ScatterItem)
+#         # self.ScatterItem.addPoints(self.pll[:, 0], self.pll[:, 1])
+        
+        
+#         self.polyline = pg.PlotCurveItem(
+#             #pxMode=True,  # Set pxMode=False to allow points to transform with the view
+#             #size=self.psz,
+#             #brush= pg.mkBrush(self.pclr),
+#             #hoverable=False,
+#             #hoverPen=pg.mkPen(self.hclr, width=self.psz/15),
+#             #hoverSize=self.psz*1.3
+#             )
+#         self.polyline.setClickable(True, width=10)
+#         self.PlotItem.addItem(self.polyline)
+#         self.polyline.setData(self.pll[:, 0], self.pll[:, 1])
+
+#         # print(self.segments)
+#         self.view.scene().sigMouseMoved.connect(self.changecolor)
+        
+        
+#         # # QUESTO FUNZIONA ###############################
+#         # for i in self.segments:
+#         #     i.sigClicked.connect(self.changecolor)
+#         # ####################################################
+            
+#         # self.PlotItem.scene().sigMouseHover.connect(self.changecolor)
+#         # self.PlotItem.scene().mouseEvents
+#         # self.PlotItem.scene().sigMouseHover
+#         # self.segments[0].hoverEvent()
+        
+#         # self.hev = self.PlotItem.scene().sigMouseHover
+#         # self.hev.connect(self.changecolor)
+        
+#         # self.PlotItem.scene().HoverEnter.connect(self.changecolor)
+#         # self.PlotItem.hoverEvent()
+#         # from pyqtgraph.GraphicsScene import mouseEvents
+#         # self.hev = mouseEvents.HoverEvent()
+        
+
+
+
+
+
 class AddPointOnLine:
     """
     Class that handles data and signals to add a point in a polyline
     See example 4 at the bottom of this module.
     """
-    def __init__(self, view, pll, PlotItem, psz, lwdth=5, lclr=(0, 100, 200, 255), pclr=(90, 0, 0, 255), hclr='g', hlclr=(0, 0, 250, 255), verbose=False):
-        self.view = view
+    def __init__(self, pll, PlotItem, psz, lwdth=5, lclr=(0, 100, 200, 255), pclr=(90, 0, 0, 255), hclr='g', hlclr=(0, 255, 70, 255), verbose=False):
         self.pll = pll              # np array of points (or polilyne)
         self.PlotItem = PlotItem    # pyqtgraph plot item
         self.psz = psz              # Size of points
@@ -404,56 +522,201 @@ class AddPointOnLine:
         self.hlclr = hlclr          # Color of the line when the mouse is on it (hover)
         self.verbose = verbose      # If True, plots the changing pll after the action is completed
     
-    def changecolor(self,ev):
-        # event[0].isEnter()
-        # self.segments[0].isEnter()
-        # print(items[0].listDataItems(), '\n')
-        # items[0].setBrush((100, 0, 0, 255))
-        # print(self.segments[0].isEnter())
-        print(ev)
-        # print(len(items))
-        # print(type(items[0]))
-        # print(type(items[1]))
-        # self.view.sigMouseHover.disconnect(self.changecolor)
+    def changecolor(self, event):
+        pos = event  # The position for sigMouseMoved is already in Scene Coordinates
+        mpos = self.PlotItem.vb.mapSceneToView(pos)  # Mouse position
         
+        # print(self.invisible_polyline.mouseShape().contains(mpos))
+        if self.invisible_polyline.mouseShape().contains(mpos):
+            found = False  # Counter to avoid selecting two segments together
+            discarded = 0
+            for key in self.segments:
+                if self.segments[key][0].mouseShape().contains(mpos) and found == False:
+                    self.segments[key][0].setPen(pg.mkPen(color=self.hlclr, width=self.lwdth*1.3))
+                    self.tomodify = key  # Selected segment where to add a point (after a click)
+                    found = True
+                else:
+                    self.segments[key][0].setPen(pg.mkPen(color=self.lclr, width=self.lwdth))
+                    discarded += 1
+                if discarded == len(self.segments):
+                    self.tomodify = None
+            found = False
+        else:
+            self.tomodify = None
         
-    def start(self):
-        """ ................
-        """
-        # Create a plotcurve item for every segment of the polyline
-        self.segments = []
+        # print(self.tomodify)
+    
+    def addPoint(self, event):
+        if self.tomodify is not None:
+            
+            # self.PlotItem.scene().sigMouseMoved.disconnect(self.changecolor)
+            # self.PlotItem.scene().sigMouseClicked.disconnect(self.addPoint)
+            
+            pos = event.scenePos()
+            pos_click = self.PlotItem.vb.mapSceneToView(pos)
+            x_p = pos_click.x()
+            y_p = pos_click.y()
+            
+            self.segments[self.tomodify][1] = np.insert(self.segments[self.tomodify][1], 1, [x_p, y_p], axis=0)
+            
+            tempstack = np.array([[None, None]])
+            for key in self.segments:
+                tempstack = np.vstack((tempstack, self.segments[key][1]))
+            tempstack = np.delete(tempstack, 0, axis=0).astype(dtype=np.float32, copy=False)
+            print("\n\nTEMPSTACK\n")
+            print(tempstack)
+            
+            
+            newpolyline = np.array([[None, None]]).astype(dtype=np.float32, copy=False)
+            for row in tempstack:
+                if np.any(row != newpolyline[-1]):
+                    newpolyline = np.vstack((newpolyline, row))
+                else:
+                    print('\n\nCHECK')
+                    print("row\n", row)
+                    print("newpoly[-1]\n", newpolyline[-1])
+                    continue
+            newpolyline = np.delete(newpolyline, 0, axis=0)
+            self.pll = newpolyline.astype(dtype=np.float32, copy=False)
+            
+            print("\n\n\MODIFIED\n")
+            print(self.pll)
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            # newpolyline = np.array([[None, None]])
+            
+            # # for key in range(0, len(self.segments), 2):
+            # #     newpolyline = np.vstack((newpolyline, self.segments[key][1]))
+            # # if len(self.segments) % 2 != 0:
+            # #     newpolyline = np.vstack((newpolyline, self.segments[len(self.segments) - 1][1][1, :]))
+            # # newpolyline = np.delete(newpolyline, 0, axis=0)
+            
+            # for key in self.segments:
+            #     newpolyline = np.vstack((newpolyline, self.segments[key][1]))
+            # newpolyline = np.delete(newpolyline, 0, axis=0)
+            
+            # new2 = np.array([[None, None]])
+            # for row in newpolyline:
+            #     if np.all(row != new2[-1]):
+            #         new2 = np.vstack((new2, row))
+            #     else:
+            #         continue
+            
+            # newpolyline = new2
+
+
+            # self.pll = newpolyline.astype(dtype=np.float32, copy=False)
+            # # self.pll = np.array([[1, 2], [3, 4], [5, 6], [7, 8], [7, 3], [1, 3]])
+            
+            # """
+            # 1 2 3 4 5 6 7 8 9
+            # 1 2, 2 3, 3 4, 4 5, 5 6, 6 7, 7 8, 8 9
+            # 0          2         4         6   __7
+            
+            
+            # 1 2 3 4 5 6 7 8
+            # 1 2, 2 3, 3 4, 4 5, 5 6, 6 7, 7 8
+            #  0         2         4         6   
+            
+            
+            
+            # """
+            # print("MODIFIED\n\n\n\n\n", self.pll)
+            
+            for key in self.segments:
+                # self.segments[key][0].clear()
+                self.PlotItem.removeItem(self.segments[key][0])
+                
+                
+            # self.invisible_polyline.clear()
+            self.PlotItem.removeItem(self.invisible_polyline)
+            # self.ScatterItem.clear()
+            self.PlotItem.removeItem(self.ScatterItem)
+            
+            self.segments = {}
+            self.setupItems()
+
+
+    def setupItems(self):
+        # Create a plotcurve item for every segment of the polyline      
+        self.segments = {}
         for i in range(self.pll.shape[0]-1):
             x = np.array([self.pll[i, 0], self.pll[i+1, 0]])
             y = np.array([self.pll[i, 1], self.pll[i+1, 1]])
             CurveItem = pg.PlotCurveItem(
-            pen=pg.mkPen(color=self.lclr, width=self.lwdth),
-            clickable=True)
-            # CurveItem.setClickable(None, width=100)
+            pen=pg.mkPen(color=self.lclr, width=self.lwdth))
+            CurveItem.setClickable(False, width=7)
             CurveItem.setData(x, y)
-            # CurveItem.setClickable(True, width=4)
             self.PlotItem.addItem(CurveItem)
-            self.segments.append(CurveItem)
+            # self.segments.append(CurveItem)
+            xy = np.hstack((x.reshape(2, 1), y.reshape(2, 1))).astype(dtype=np.float32, copy=False)
+            self.segments[i] = [CurveItem, xy]
+            
+        # This invisible_polyline avoids to keep looping
+        # on all the segments when the mouse is far from the polyline
+        self.invisible_polyline = pg.PlotCurveItem(
+            pen=pg.mkPen((255, 255, 0, 0), width=1))
+        self.invisible_polyline.setClickable(False, width=100)
+        self.PlotItem.addItem(self.invisible_polyline)
+        self.invisible_polyline.setData(self.pll[:, 0], self.pll[:, 1])
+        # Plot points at the ends of the segments
+        self.ScatterItem = pg.ScatterPlotItem(pxMode=True, size=self.psz, brush= pg.mkBrush(self.pclr))
+        self.ScatterItem.addPoints(self.pll[:, 0], self.pll[:, 1])
+        self.PlotItem.addItem(self.ScatterItem)
         
+
+
+    def start(self):
+        """ ................
+        """
         
-        # self.ScatterItem = pg.ScatterPlotItem(
-        #     pxMode=True,  # Set pxMode=False to allow points to transform with the view
-        #     size=self.psz,
-        #     brush= pg.mkBrush(self.pclr),
-        #     hoverable=True,
-        #     hoverPen=pg.mkPen(self.hclr, width=self.psz/15),
-        #     hoverSize=self.psz*1.3)
-        # self.PlotItem.addItem(self.ScatterItem)
+        # # Create a plotcurve item for every segment of the polyline      
+        # self.segments = {}
+        # for i in range(self.pll.shape[0]-1):
+        #     x = np.array([self.pll[i, 0], self.pll[i+1, 0]])
+        #     y = np.array([self.pll[i, 1], self.pll[i+1, 1]])
+        #     CurveItem = pg.PlotCurveItem(
+        #     pen=pg.mkPen(color=self.lclr, width=self.lwdth))
+        #     CurveItem.setClickable(True, width=5)
+        #     CurveItem.setData(x, y)
+        #     self.PlotItem.addItem(CurveItem)
+        #     # self.segments.append(CurveItem)
+        #     xy = np.hstack((x.reshape(2, 1), y.reshape(2, 1)))
+        #     self.segments[i] = [CurveItem, xy]
+            
+        # # This invisible_polyline avoids to keep looping
+        # # on all the segments when the mouse is far from the polyline
+        # self.invisible_polyline = pg.PlotCurveItem(
+        #     pen=pg.mkPen((255, 255, 0, 0), width=1))
+        # self.invisible_polyline.setClickable(False, width=100)
+        # self.PlotItem.addItem(self.invisible_polyline)
+        # self.invisible_polyline.setData(self.pll[:, 0], self.pll[:, 1])
+        # # Plot points at the ends of the segments
+        # self.ScatterItem = pg.ScatterPlotItem(pxMode=True, size=self.psz, brush= pg.mkBrush(self.pclr))
         # self.ScatterItem.addPoints(self.pll[:, 0], self.pll[:, 1])
+        # self.PlotItem.addItem(self.ScatterItem)
 
         # print(self.segments)
-        # self.view.scene().sigMouseMoved.connect(self.changecolor)
         
-        for i in self.segments:
-            i.sigClicked.connect(self.changecolor)
-            
-        # self.PlotItem.scene().sigMouseHover.connect(self.changecolor)
-        # self.PlotItem.scene().mouseEvents
-        # self.PlotItem.scene().sigMouseHover
+        self.pll = self.pll.astype(dtype=np.float32, copy=False)
+        
+        print("\n\n\nINITIAL\n", self.pll)
+        
+        self.setupItems()
+        self.PlotItem.scene().sigMouseMoved.connect(self.changecolor)
+        self.PlotItem.scene().sigMouseClicked.connect(self.addPoint)
+        
         
 
 
@@ -477,9 +740,9 @@ if __name__ == "__main__":
     # 1: Remove points with a click or with a rectangular selection
     # 2: Remove points selected with a rectangular shape
     # 3: Move a point: click1 start dragging, click2 stop dragging
-    # 4: To do...
+    # 4: Add a point on a polyline
     # 5: To do...
-    example = 3
+    example = 2
     
     from pyqtgraph.Qt import QtGui
 
@@ -490,7 +753,7 @@ if __name__ == "__main__":
     plot.setAspectLocked(True)
     
     points = np.array([[0, 0], [0, 1], [0, 2], [1, 0], [1, 1], [1, 2], [2, 0], [2, 1], [2, 2]]).astype(dtype=np.float32, copy=False) * 10
-    polyline1 = np.array([[0, 0], [5, 1], [10, 5], [15, 3], [20, 10], [25, 7], [30, 7], [35, 15], [40, 9]]).astype(dtype=np.float32, copy=False)
+    polyline1 = np.array([[0, 0], [5, 1], [10, 5], [15, 3], [20, 10], [25, 7], [30, 7], [35, 15], [40, 9], [50, 0]]).astype(dtype=np.float32, copy=False)
     polyline2 = polyline1 + 30
     polyline3 = polyline2 + 20
     
@@ -523,15 +786,67 @@ if __name__ == "__main__":
         instance3.start()
         
     elif example == 4:
-        instance1 = AddPointOnLine(view, points, plot, 15)
+        instance1 = AddPointOnLine(points, plot, 15)
         instance1.start()
-        # print(plot.listDataItems())
         
+        instance2 = AddPointOnLine(polyline2, plot, 15, lclr=(100,50,10,255), pclr=(0,200,100,255), hlclr=(0, 150, 150, 255))
+        instance2.start()
+
     elif example == 5:
-        pass
+        
+        
+        # pll = np.array([[1, 2], [3, 4], [5, 6], [7, 8], [9, 10]]).astype(dtype=np.float32, copy=False)
+        pll = np.array([[1, 2], [3, 4], [5, 6], [7, 8], [9, 10], [11, 12]]).astype(dtype=np.float32, copy=False)
+        segments = {}
+        for i in range(pll.shape[0]-1):
+            x = np.array([pll[i, 0], pll[i+1, 0]])
+            y = np.array([pll[i, 1], pll[i+1, 1]])
+            xy = np.hstack((x.reshape(2, 1), y.reshape(2, 1)))
+            segments[i] = [xy]
+        
+        print("\n\n\nINITIAL\n", pll)
+        
+        
+        
+        
+        segments[2][0] = np.insert(segments[2][0], 1, [9.1212, 99.354564], axis=0)
+        
+        for key in segments:
+            print(segments[key][0])
+        
+        print("\n", segments[2][0])
+        
+        
+        
+        tempstack = np.array([[None, None]])
+        
+
+        for key in segments:
+            tempstack = np.vstack((tempstack, segments[key][0]))
+        tempstack = np.delete(tempstack, 0, axis=0)
+        print("\n\nTEMPSTACK")
+        print(tempstack)
+        
+        
+        newpolyline = np.array([[None, None]])
+        for row in tempstack:
+            if np.all(row != newpolyline[-1]):
+                newpolyline = np.vstack((newpolyline, row))
+            else:
+                continue
+        newpolyline = np.delete(newpolyline, 0, axis=0)
+        
+        print("\n\n\AFTER")
+        print(newpolyline)
+        
+
+        
     
     
     QtGui.QApplication.instance().exec_()
+
+
+
     
     
     
