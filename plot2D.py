@@ -13,6 +13,7 @@ import pyqtgraph as pg
 
 
 
+
 def plot_grid(PlotItem, xdim, ydim, xmin, xmax, ymin, ymax):
     """
     Plots a grid whose space between lines is given by xdim and ydim,
@@ -706,10 +707,156 @@ class RemovePolyline:
         self.PlotItem.scene().sigMouseMoved.disconnect(self.__getPolyline)
         self.PlotItem.sigRangeChanged.disconnect(self.__refresh_clickable_area)
         self.PlotItem.scene().sigMouseClicked.disconnect(self.__popPolyline)
-    
+
+
+
+
+
+class DrawPolyline:
+    """
+    Class that handles data and signals to draw a new polyline.
+    See example 6 at the bottom of this module.
+    """
+    def __init__(self, plls, PlotItem, psz, lwdth=3, lclr=(0, 100, 200, 255), pclr=(90, 0, 0, 255), hclr='g', fclr=(0, 0, 250, 255), verbose=False):
+        self.plls = plls            # List of np arrays of existing polylines
+        self.PlotItem = PlotItem    # pyqtgraph plot item
+        self.psz = psz              # Size of points
+        self.lwdth = lwdth          # Line width
+        self.lclr = lclr            # Color of the line
+        self.pclr = pclr            # Color of the points
+        self.hclr = hclr            # Color or the hover of the last point used to finalize
+        self.fclr = fclr            # Color of the last point used to finalize
+        self.verbose = verbose      # If True, plots the changing pll after the action is completed
+
+    def __draw_points(self, event):
+        """ This method takes the click to draw a point, then adds its coords
+        to the points_list... lists and updates the plot.
+        """
+        if self.hovered == False:  # Condition to avoid conflict with sigClicked from clickable_point 
+            pos = event.scenePos()
+            click_coords = self.PlotItem.vb.mapSceneToView(pos)
+            self.points_list_x.append(click_coords.x())
+            self.points_list_y.append(click_coords.y())
+            self.clickable_point.clear()
+            self.line_between.clear()
+            self.temp_line.clear()
+            
+            if len(self.points_list_x) >= 2:
+                self.line_between.setData(self.points_list_x, self.points_list_y)
+                self.drawn_points.setData(self.points_list_x[:-1], self.points_list_y[:-1])
+                self.clickable_point.setData([self.points_list_x[-1]], [self.points_list_y[-1]])
+            elif len(self.points_list_x) == 1:
+                self.drawn_points.setData(self.points_list_x, self.points_list_y)
+
+    def __draw_temp_line(self, event):
+        """ This method draws the moving line between the last drawn point and the 
+        mouse pointer.
+        """
+        self.hovered = False  # Set condition to avoid conflict with sigClicked from clickable_point 
+        pos = event
+        mouse_coords = self.PlotItem.vb.mapSceneToView(pos)
+        if len(self.points_list_x) >= 1:
+            self.temp_line.clear()
+            xx = [self.points_list_x[-1]]
+            xx.append(mouse_coords.x())
+            yy = [self.points_list_y[-1]]
+            yy.append(mouse_coords.y())
+            self.temp_line.setData(xx, yy)
+
+    def __hovered(self):
+        """ This method, connected with self.clickable_point.sigHovered.connect(self.__hovered),
+        is needed only to avoid a conflict that happens because the sigClicked of the
+        clicking on the clickable_point is emitted together with the sigMouseClicked
+        of the self.PlotItem.
+        """
+        self.hovered = True
+
+    def __finalize(self, plot, points, ev):
+        """ This method takes the new drawn polylines and adds it to the initial
+        self.plls list of static polylines, then refreshes everything.
+        """
+        self.hovered = True
+        # Add polyline to initial list
+        plen = len(self.points_list_x)
+        newpolyline = np.hstack((np.array(self.points_list_x).reshape(plen, 1), np.array(self.points_list_y).reshape(plen, 1)))
+        self.plls.append(newpolyline)
+        # Refresh plot
+        self.drawn_points.clear()
+        self.clickable_point.clear()
+        self.line_between.clear()
+        self.temp_line.clear()
+        self.__setStaticItems()
+        if self.verbose:
+            print('Updated number of polylines: ', len(self.plls))
+            print("New polyline:\n", newpolyline)
+        # Set default data
+        self.points_list_x = []
+        self.points_list_y = []
+
+    def __setStaticItems(self):
+        """ This method sets up and plots the initial given static polylines
+        in self.plls.
+        """
+        # Create a dict with key=int corresponding to the self.plls index
+        # and value = PlotCurveItem_ith
+        self.CurveItems = {} # At the end I did't use this dictionary, have to check if something can be simplified
+        for i in range(len(self.plls)):
+            CurveItem = pg.PlotCurveItem(
+            pen=pg.mkPen(color=self.lclr, width=self.lwdth))
+            #### CurveItem.setSkipFiniteCheck(True)   ## Needed recent version of pyqtgraph
+            CurveItem.setData(self.plls[i][:, 0], self.plls[i][:, 1])
+            self.PlotItem.addItem(CurveItem)
+            self.CurveItems[i] = CurveItem
+        # Here the insivible polyline is used to plot
+        # all the vertices using only one ScatterPlotItem
+        polylines_linked = self.plls[0]
+        for pll in self.plls[1:]:
+            polylines_linked = np.vstack((polylines_linked, pll))
+        # Plot points at the vertices of the polylines
+        self.ScatterItem = pg.ScatterPlotItem(pxMode=True, size=self.psz, brush=pg.mkBrush(self.pclr))
+        self.ScatterItem.setData(polylines_linked[:, 0], polylines_linked[:, 1])
+        self.PlotItem.addItem(self.ScatterItem)
+
+    def start(self):
+        """ This method starts everything just as the other classes above.
+        Call it after an instance of this class has been created.
+        """
+        # Call private method to setup the plot
+        self.__setStaticItems()
+        if self.verbose:
+            print('Initial number of polylines: ', len(self.plls))
+        # Create empty items that will be used by the drawing functions       
+        light_lclr = list(self.lclr)
+        light_lclr[3] = 100
+        light_lclr = tuple(light_lclr)
+        self.line_between = pg.PlotCurveItem(pen=pg.mkPen(color=light_lclr, width=self.lwdth))
+        self.PlotItem.addItem(self.line_between)
+        self.temp_line = pg.PlotCurveItem(pen=pg.mkPen(color=light_lclr, width=self.lwdth))
+        self.PlotItem.addItem(self.temp_line)
+        self.drawn_points = pg.ScatterPlotItem(pxMode=True, size=self.psz, brush= pg.mkBrush(self.pclr))
+        self.PlotItem.addItem(self.drawn_points)
+        self.clickable_point = pg.ScatterPlotItem(pxMode=True, size=1.5*self.psz, brush= pg.mkBrush(self.pclr),
+                                                  hoverable=True, hoverPen=pg.mkPen(self.hclr, width=self.psz/10), hoverSize=self.psz*1.3)
+        self.clickable_point.setSymbol('+')
+        self.PlotItem.addItem(self.clickable_point)
+        # Set default data
+        self.points_list_x = []
+        self.points_list_y = []
+        self.hovered = False
+        # Connect signals
+        self.PlotItem.scene().sigMouseClicked.connect(self.__draw_points)
+        self.PlotItem.scene().sigMouseMoved.connect(self.__draw_temp_line)
+        self.clickable_point.sigClicked.connect(self.__finalize)
+        self.clickable_point.sigHovered.connect(self.__hovered)
+        
 
         
         
+
+
+
+
+
 
 
 
@@ -733,11 +880,11 @@ if __name__ == "__main__":
     # 2: Remove points selected with a rectangular shape
     # 3: Move a point: click1 start dragging, click2 stop dragging
     # 4: Add a point (vertex) in a polyline
-    # 5: To do...
-    # 6: To do...
+    # 5: Remove a polyline by clicking on it
+    # 6: Draw a new polyline
     # 7: To do...
     # 8: To do...
-    example = 5
+    example = 6
     
     from pyqtgraph.Qt import QtGui
 
@@ -798,7 +945,9 @@ if __name__ == "__main__":
         # instance2.start()
 
     elif example == 6:
-        pass
+        instance1 = DrawPolyline([points, polyline2, polyline3], plot, 15, verbose=True)
+        instance1.start()
+        
     elif example == 7:
         pass
     elif example == 8:
