@@ -550,6 +550,164 @@ class AddPointOnLine:
         self.PlotItem.scene().sigMouseClicked.disconnect(self.__addPoint)
         self.PlotItem.sigRangeChanged.disconnect(self.__refresh_clickable_area)
 
+
+
+
+
+class RemovePolyline:
+    """
+    Class that handles data and signals to remove a polyline given a list that
+    contains one or more polylines as np arrays.
+    See example 5 at the bottom of this module.
+    """
+    def __init__(self, plls, PlotItem, psz, lwdth=5, lclr=(0, 100, 200, 255), pclr=(90, 0, 0, 255), hclr='g', hlclr=(0, 255, 70, 255), verbose=False):
+        self.plls = plls              # list containing np arrays of polylines
+        self.PlotItem = PlotItem    # pyqtgraph plot item
+        self.psz = psz              # Size of points
+        self.lwdth = lwdth          # Line width
+        self.lclr = lclr            # Color of the line
+        self.pclr = pclr            # Color of the points
+        self.hclr = hclr            # Color or the hover
+        self.hlclr = hlclr          # Color of the line when the mouse is on it (hover)
+        self.verbose = verbose      # If True, plots the changing pll after the action is completed
+    
+    def __getPolyline(self, event):
+        """ This method changes the color of the pollyline under the mouse pointer and 
+        then saves the key of the dictionary self.CurveItem (corresponding to the index of
+        the self.plls item that has to be removed) in self.tomodify
+        """
+        pos = event  # The position for sigMouseMoved is already in Scene Coordinates
+        mpos = self.PlotItem.vb.mapSceneToView(pos)  # Mouse position
+        # Highlight the element under the mouse pointer and save its key in self.tomodify
+        if self.invisible_polyline.mouseShape().contains(mpos):
+            found = False  # Counter to avoid selecting two segments together
+            discarded = 0
+            for key in self.CurveItems:
+                if self.CurveItems[key].mouseShape().contains(mpos) and found == False:
+                    self.CurveItems[key].setPen(pg.mkPen(color=self.hlclr, width=self.lwdth*1.3))
+                    self.tomodify = key  # Dict's key of the selected segment where to add a point (after a click)
+                    found = True
+                else:
+                    self.CurveItems[key].setPen(pg.mkPen(color=self.lclr, width=self.lwdth))
+                    discarded += 1
+                if discarded == len(self.CurveItems):
+                    self.tomodify = None
+            found = False
+        else:
+            self.tomodify = None
+    
+    def __popPolyline(self, event):
+        """ This method removes the clicked polyline from the list self.plls 
+        through the standard python pop method, then refreshes everything.
+        """
+        if self.tomodify is not None:  # self.tomodify is set in __Polyline method
+            # Disconnect signal for refresh function to avoid plot problems
+            self.PlotItem.sigRangeChanged.disconnect(self.__refresh_clickable_area)
+            # Remove the clicked polyline from the list
+            self.plls.pop(self.tomodify)
+            # Update the polyline attribute self.pll with the new reassembled one
+            if self.verbose:
+                print("\nNew number of polylines: ", len(self.plls))
+            # Clean up the plot and CurveItems dictionary
+            for key in self.CurveItems:
+                self.PlotItem.removeItem(self.CurveItems[key])
+            self.PlotItem.removeItem(self.invisible_polyline)
+            self.PlotItem.removeItem(self.ScatterItem)
+            self.CurveItems = {}
+            # Setup again plot and data
+            self.__setupItems()
+            # Reconnect signal
+            self.PlotItem.sigRangeChanged.connect(self.__refresh_clickable_area)
+    
+    def __refresh_clickable_area(self):
+        """ This method solves the problem that happen when after a point has
+        been added with a lot of zoom, it is not possible to click on the segment
+        if the user zooms out.
+        
+        !! For this RemovePolyline class this method could be disconnected
+        to improve performances, or maybe just set a higher threshold !!
+        """
+        # Get ViewBox's viewrange info
+        vbstate = self.PlotItem.vb.getState(copy=True)
+        viewrange = vbstate['viewRange']
+        new_xwidth = viewrange[0][1] - viewrange[0][0]
+        # Update everything only if the user has zoomed more than a threshold
+        if np.absolute((self.xwidth - new_xwidth) / self.xwidth) > 0.7:
+            # Disconnect signals to avoid problems (Maybe useless)
+            self.PlotItem.scene().sigMouseMoved.disconnect(self.__getPolyline)
+            self.PlotItem.scene().sigMouseClicked.disconnect(self.__popPolyline)
+            # Update self.xwidth
+            self.xwidth = new_xwidth
+            # Clean up plot and populate it again (through __setupItems)
+            for key in self.CurveItems:
+                self.PlotItem.removeItem(self.CurveItems[key])
+            self.PlotItem.removeItem(self.invisible_polyline)
+            self.PlotItem.removeItem(self.ScatterItem)
+            self.CurveItems = {}
+            self.__setupItems()
+            # Reconnect signals
+            self.PlotItem.scene().sigMouseMoved.connect(self.__getPolyline)
+            self.PlotItem.scene().sigMouseClicked.connect(self.__popPolyline)
+
+    def __setupItems(self):
+        """ This method creates a dict of segments from the polyline and
+        plots them and the points at the vertices of the polyline.
+        """
+        try:
+            # Create a dict with key=int corresponding to the self.plls index
+            # and value = PlotCurveItem_ith
+            self.CurveItems = {}
+            for i in range(len(self.plls)):
+                CurveItem = pg.PlotCurveItem(
+                pen=pg.mkPen(color=self.lclr, width=self.lwdth))
+                CurveItem.setClickable(False, width=7)
+                #### CurveItem.setSkipFiniteCheck(True)   ## Needed recent version of pyqtgraph
+                CurveItem.setData(self.plls[i][:, 0], self.plls[i][:, 1])
+                self.PlotItem.addItem(CurveItem)
+                self.CurveItems[i] = CurveItem
+                
+            # This invisible_polyline avoids to keep looping
+            # on all the polylines when the mouse pointer is far from them
+            polylines_linked = self.plls[0]
+            for pll in self.plls[1:]:
+                polylines_linked = np.vstack((polylines_linked, pll))
+            self.invisible_polyline = pg.PlotCurveItem(
+                pen=pg.mkPen((255, 255, 0, 0), width=1))
+            self.invisible_polyline.setClickable(False, width=100)
+            self.invisible_polyline.setData(polylines_linked[:, 0], polylines_linked[:, 1])
+            self.PlotItem.addItem(self.invisible_polyline)
+            # Plot points at the vertices of the polylines
+            self.ScatterItem = pg.ScatterPlotItem(pxMode=True, size=self.psz, brush= pg.mkBrush(self.pclr))
+            self.ScatterItem.addPoints(polylines_linked[:, 0], polylines_linked[:, 1])
+            self.PlotItem.addItem(self.ScatterItem)
+        except IndexError:
+            print('\nNo more polylines to delete!')
+
+    def start(self):
+        """ This method starts everything just as the other classes above.
+        Call it after an instance of this class has been created.
+        """
+        if self.verbose:
+            print("\nInitial number of polylines: ", len(self.plls))
+            print(self.plls)
+        # Initialize plots and data and connect signals
+        self.__setupItems()
+        self.PlotItem.scene().sigMouseMoved.connect(self.__getPolyline)
+        self.PlotItem.sigRangeChanged.connect(self.__refresh_clickable_area)
+        self.PlotItem.scene().sigMouseClicked.connect(self.__popPolyline)
+        # Get initial viewrange of the ViewBox, needed only for
+        # __refresh_clickable_area method
+        vbstate = self.PlotItem.vb.getState(copy=True)
+        viewrange = vbstate['viewRange']
+        self.xwidth = viewrange[0][1] - viewrange[0][0]
+        
+    def stop(self):
+        """ If called, this method disconnects all the signals """
+        self.PlotItem.scene().sigMouseMoved.disconnect(self.__getPolyline)
+        self.PlotItem.sigRangeChanged.disconnect(self.__refresh_clickable_area)
+        self.PlotItem.scene().sigMouseClicked.disconnect(self.__popPolyline)
+    
+
         
         
 
@@ -576,7 +734,10 @@ if __name__ == "__main__":
     # 3: Move a point: click1 start dragging, click2 stop dragging
     # 4: Add a point (vertex) in a polyline
     # 5: To do...
-    example = 4
+    # 6: To do...
+    # 7: To do...
+    # 8: To do...
+    example = 5
     
     from pyqtgraph.Qt import QtGui
 
@@ -630,6 +791,17 @@ if __name__ == "__main__":
         instance2.start()
 
     elif example == 5:
+        instance1 = RemovePolyline([points, polyline1, polyline2, polyline3], plot, 15, verbose=True)
+        instance1.start()
+        
+        # instance2 = RemovePolyline([polyline3], plot, 15, lclr=(100,50,10,255), pclr=(0,200,100,255), hlclr=(0, 150, 150, 255), verbose=True)
+        # instance2.start()
+
+    elif example == 6:
+        pass
+    elif example == 7:
+        pass
+    elif example == 8:
         pass
 
     QtGui.QApplication.instance().exec_()
