@@ -717,7 +717,7 @@ class DrawPolyline:
     Class that handles data and signals to draw a new polyline.
     See example 6 at the bottom of this module.
     """
-    def __init__(self, plls, PlotItem, psz, lwdth=3, lclr=(0, 100, 200, 255), pclr=(90, 0, 0, 255), hclr='g', fclr=(0, 0, 250, 255), verbose=False):
+    def __init__(self, plls, PlotItem, psz, lwdth=3, lclr=(0, 100, 200, 255), pclr=(90, 0, 0, 255), hclr='g', verbose=False):
         self.plls = plls            # List of np arrays of existing polylines
         self.PlotItem = PlotItem    # pyqtgraph plot item
         self.psz = psz              # Size of points
@@ -725,7 +725,6 @@ class DrawPolyline:
         self.lclr = lclr            # Color of the line
         self.pclr = pclr            # Color of the points
         self.hclr = hclr            # Color or the hover of the last point used to finalize
-        self.fclr = fclr            # Color of the last point used to finalize
         self.verbose = verbose      # If True, plots the changing pll after the action is completed
 
     def __draw_points(self, event):
@@ -821,7 +820,7 @@ class DrawPolyline:
         """ This method starts everything just as the other classes above.
         Call it after an instance of this class has been created.
         """
-        # Call private method to setup the plot
+        # Call private method to setup data and add to the plot the existing not editable polylines
         self.__setStaticItems()
         if self.verbose:
             print('Initial number of polylines: ', len(self.plls))
@@ -849,6 +848,12 @@ class DrawPolyline:
         self.clickable_point.sigClicked.connect(self.__finalize)
         self.clickable_point.sigHovered.connect(self.__hovered)
         
+    def stop(self):
+        """ If called, this method disconnects all the signals """
+        self.PlotItem.scene().sigMouseClicked.disconnect(self.__draw_points)
+        self.PlotItem.scene().sigMouseMoved.disconnect(self.__draw_temp_line)
+        self.clickable_point.sigClicked.disconnect(self.__finalize)
+        self.clickable_point.sigHovered.disconnect(self.__hovered)
 
         
         
@@ -884,7 +889,7 @@ if __name__ == "__main__":
     # 6: Draw a new polyline
     # 7: To do...
     # 8: To do...
-    example = 6
+    example = 4
     
     from pyqtgraph.Qt import QtGui
 
