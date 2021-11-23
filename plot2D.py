@@ -1,6 +1,9 @@
 ###############################################################################
 # This module contains the functions needed to plot in pyqtgraph and
-# to interact with the plotted entities
+# to interact with the plotted.
+#
+# Run this file as __main__ to see the mouse interaction examples.
+# Check the bottom of this module to choose which example you want to run.
 #
 # WORK IN PROGRESS!!!!
 ###############################################################################
@@ -204,7 +207,6 @@ class RemovePointsRect:
                 pen=pg.mkPen(color=self.lclr, width=self.lwdth))
             self.CurveItem.setData(self.pts_b[:, 0], self.pts_b[:, 1])
             self.PlotItem.addItem(self.CurveItem)
-        
         
         # Plot points
         self.ScatterItem = pg.ScatterPlotItem(pxMode=True, size=self.psz, brush= pg.mkBrush(self.pclr))
@@ -855,14 +857,134 @@ class DrawPolyline:
         self.clickable_point.sigClicked.disconnect(self.__finalize)
         self.clickable_point.sigHovered.disconnect(self.__hovered)
 
+
+
+
+
+class JoinPolylines:
+    """
+    Class that handles data and signals to join two polylines by clicking
+    on their end points.
+    See example 7 at the bottom of this module.
+    """
+    def __init__(self, plls, PlotItem, psz, lwdth=3, lclr=(0, 100, 200, 255), pclr=(90, 0, 0, 255), hclr='g', verbose=False):
+        self.plls = plls            # List of np arrays of existing polylines
+        self.PlotItem = PlotItem    # pyqtgraph plot item
+        self.psz = psz              # Size of points
+        self.lwdth = lwdth          # Line width
+        self.lclr = lclr            # Color of the line
+        self.pclr = pclr            # Color of the points
+        self.hclr = hclr            # Color or the hover of the last point used to finalize
+        self.verbose = verbose      # If True, plots the changing pll after the action is completed
+           
+    def __join_polylines(self, plot, points, ev):
+        """ For click one, this method stores info about the clicked point, which
+        polyline it belongs to and if it is a head or a tail vertex. The clickable
+        extreme points are updated as well to avoid conflicts.
+        With click two, info are got as clic one, then the two polylines are joined
+        and finally the plot and signals are refreshed.
+        """
+        if points.shape[0] == 1:
+            if self.first_poly is None:
+                # Indentify and store info of the first polyline and its clicked point
+                x_p = tuple(points[0].pos())[0]  # x coord of the clicked point
+                y_p = tuple(points[0].pos())[1]  # y coord of the clicked point
+                for i in range(len(self.plls)):
+                    if [x_p, y_p] in self.plls[i].tolist():
+                        self.first_poly = [i, self.plls[i].tolist().index([x_p, y_p])]
+                        
+                # Refresh the extreme_points to avoid clicking again on the first_poly
+                self.extreme_points.clear()
+                for i in range(len(self.plls)):
+                    if i != self.first_poly[0]:                   
+                        self.extreme_points.addPoints([self.plls[i][0, 0], self.plls[i][-1, 0]], [self.plls[i][0, 1], self.plls[i][-1, 1]])
+                        
+            elif self.first_poly is not None:
+                # Indentify and store info of the second polyline and its clicked point
+                x_p = tuple(points[0].pos())[0]
+                y_p = tuple(points[0].pos())[1]
+                for i in range(len(self.plls)):
+                    if [x_p, y_p] in self.plls[i].tolist():
+                        self.second_poly = [i, self.plls[i].tolist().index([x_p, y_p])]
+                
+                # Join the two polylines
+                if self.first_poly[1] != 0 and self.second_poly[1] == 0:
+                    newpolyline = np.vstack((self.plls[self.first_poly[0]], self.plls[self.second_poly[0]]))
+                elif self.first_poly[1] != 0 and self.second_poly[1] != 0:
+                    newpolyline = np.vstack((self.plls[self.first_poly[0]], np.flip(self.plls[self.second_poly[0]], axis=0)))
+                elif self.first_poly[1] == 0 and self.second_poly[1] == 0:
+                    newpolyline = np.vstack((np.flip(self.plls[self.first_poly[0]], axis=0), self.plls[self.second_poly[0]]))
+                if self.first_poly[1] == 0 and self.second_poly[1] != 0:
+                    newpolyline = np.vstack((self.plls[self.second_poly[0]], self.plls[self.first_poly[0]]))
+                
+                # Remove the two original polylines
+                to_remove = [self.plls[self.first_poly[0]].tolist(), self.plls[self.second_poly[0]].tolist()]
+                self.plls = [pll for pll in self.plls if pll.tolist() not in to_remove]
+                # Append new joined polyline to the plls list
+                self.plls.append(newpolyline)
+                # Set default values
+                self.first_poly = None
+                self.second_poly = None
+                # Clear plot
+                self.extreme_points.clear()
+                self.ScatterItem.clear()
+                for key in self.CurveItems:
+                    self.CurveItems[key].clear()
+                self.CurveItems = {}
+                # Refresh plot and signals
+                self.extreme_points.sigClicked.disconnect(self.__join_polylines)
+                self.__setItems()
+                self.extreme_points.sigClicked.connect(self.__join_polylines)
+                if self.verbose:
+                    print("Updated number of polylines: ", len(self.plls))
+
+    def __setItems(self):
+        """ This method sets up and plots the initial given polylines
+        stored in self.plls.
+        """
+        # Create a dict with key=int corresponding to the self.plls index
+        self.CurveItems = {} 
+        self.extreme_points = pg.ScatterPlotItem(pxMode=True, size=1.5*self.psz, brush= pg.mkBrush(self.pclr),
+                                          hoverable=True, hoverPen=pg.mkPen(self.hclr, width=self.psz/10), hoverSize=self.psz*1.3)
+        self.extreme_points.setSymbol('d')       
+        for i in range(len(self.plls)):
+            # Create and plot polylines, first and last point items
+            CurveItem = pg.PlotCurveItem(
+            pen=pg.mkPen(color=self.lclr, width=self.lwdth))
+            #### CurveItem.setSkipFiniteCheck(True)   ## Needed recent version of pyqtgraph
+            CurveItem.setData(self.plls[i][:, 0], self.plls[i][:, 1])
+            self.PlotItem.addItem(CurveItem)
+            self.extreme_points.addPoints([self.plls[i][0, 0], self.plls[i][-1, 0]], [self.plls[i][0, 1], self.plls[i][-1, 1]])
+            # Store plot items in the dictionary
+            self.CurveItems[i] = CurveItem
+            
+        self.PlotItem.addItem(self.extreme_points)
+        # Here the insivible polyline is used to plot
+        # the vertices (except first and last) using only one ScatterPlotItem
+        polylines_linked = self.plls[0][1:-1]
+        for pll in self.plls[1:]:
+            polylines_linked = np.vstack((polylines_linked, pll[1:-1]))
+        # Plot points at the vertices of the polylines (except first and last)
+        self.ScatterItem = pg.ScatterPlotItem(pxMode=True, size=self.psz, brush=pg.mkBrush(self.pclr))
+        self.ScatterItem.setData(polylines_linked[:, 0], polylines_linked[:, 1])
+        self.PlotItem.addItem(self.ScatterItem)
+
+    def start(self):
+        """ This method starts everything just as the other classes above.
+        Call it after an instance of this class has been created.
+        """
+        # Call private method to setup data and add to the plot the existing not editable polylines
+        self.__setItems()
+        if self.verbose:
+            print('Initial number of polylines: ', len(self.plls))
+        self.first_poly = None  # It will be set as [index of self.plls list, 0 for head and 1 for tail]
+        self.second_poly = None # Same as above,    
+        # Connect signal
+        self.extreme_points.sigClicked.connect(self.__join_polylines)
         
-        
-
-
-
-
-
-
+    def stop(self):
+        """ If called, this method disconnects all the signals """
+        self.extreme_points.sigClicked.disconnect(self.__join_polylines)
 
 
 
@@ -887,9 +1009,9 @@ if __name__ == "__main__":
     # 4: Add a point (vertex) in a polyline
     # 5: Remove a polyline by clicking on it
     # 6: Draw a new polyline
-    # 7: To do...
+    # 7: Join two polylines by clicking on their endpoints
     # 8: To do...
-    example = 4
+    example = 7
     
     from pyqtgraph.Qt import QtGui
 
@@ -904,7 +1026,7 @@ if __name__ == "__main__":
     polyline2 = polyline1 + 30
     polyline3 = polyline2 + 20
     
-    nn = 100
+    nn = 50
     polyline4 = np.hstack((np.arange((nn)).reshape(nn, 1), np.arange((nn)).reshape(nn, 1)))
     
     
@@ -954,7 +1076,9 @@ if __name__ == "__main__":
         instance1.start()
         
     elif example == 7:
-        pass
+        instance1 = JoinPolylines([points, polyline2, polyline3], plot, 15, verbose=True)
+        instance1.start()
+        
     elif example == 8:
         pass
 
