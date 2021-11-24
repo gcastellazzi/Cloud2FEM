@@ -301,7 +301,7 @@ def export_dxf(zcoords, polygs, filepath):
     """
     This function saves a dxf file of hatches in the filepath.
     Once in AutoCAD, polylines can be retrieved using the command
-    'hatchgenerateboudnary'
+    'hatchgenerateboundary'
     """
     dxfdoc = ezdxf.new('R2013')
     msp = dxfdoc.modelspace()

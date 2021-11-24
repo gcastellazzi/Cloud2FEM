@@ -1003,23 +1003,19 @@ class JoinPolylines:
 ##############################################################################
 if __name__ == "__main__":
     # Choose which mouse interaction example you want to see!
-    # 1: Remove points with a click or with a rectangular selection
-    # 2: Remove points selected with a rectangular shape
-    # 3: Move a point: click1 start dragging, click2 stop dragging
-    # 4: Add a point (vertex) in a polyline
-    # 5: Remove a polyline by clicking on it
-    # 6: Draw a new polyline
-    # 7: Join two polylines by clicking on their endpoints
-    # 8: To do...
-    example = 7
+    # 1:  Remove points with a click or with a rectangular selection
+    # 2:  Remove points selected with a rectangular shape
+    # 3:  Move a point: click1 start dragging, click2 stop dragging
+    # 4:  Add a point (vertex) in a polyline
+    # 5:  Remove a polyline by clicking on it
+    # 6:  Draw a new polyline
+    # 7:  Join two polylines by clicking on their endpoints  
+    # 8:  ////////////////
+    # 9:  ////////////////
+    # 10: ////////////////
+    # 11: All the examples together in a simple PyQt5 gui app
+    example = 11
     
-    from pyqtgraph.Qt import QtGui
-
-    app = QtGui.QApplication([])
-    view = pg.GraphicsLayoutWidget(show=True)
-    view.setBackground((50, 50, 50))
-    plot = view.addPlot()
-    plot.setAspectLocked(True)
     
     points = np.array([[0, 0], [0, 1], [0, 2], [1, 0], [1, 1], [1, 2], [2, 0], [2, 1], [2, 2]]).astype(dtype=np.float32, copy=False) * 10
     polyline1 = np.array([[0, 0], [5, 1], [10, 5], [15, 3], [20, 10], [25, 7], [30, 7], [35, 15], [40, 9], [50, 0]]).astype(dtype=np.float32, copy=False)
@@ -1030,59 +1026,267 @@ if __name__ == "__main__":
     polyline4 = np.hstack((np.arange((nn)).reshape(nn, 1), np.arange((nn)).reshape(nn, 1)))
     
     
-    if example == 1:
-        instance1 = RemovePointsClick(points, plot, 15, verbose=True)
-        instance1.start()
+    
+    if example <= 10:
+        from pyqtgraph.Qt import QtGui
+        app = QtGui.QApplication([])
+        view = pg.GraphicsLayoutWidget(show=True)
+        view.setBackground((50, 50, 50))
+        plot = view.addPlot()
+        plot.setAspectLocked(True)
         
-        instance2 = RemovePointsClick(polyline1, plot, 15, pclr=(0,0,90,255), verbose=True)
-        instance2.start()
+        if example == 1:
+            instance1 = RemovePointsClick(points, plot, 15, verbose=True)
+            instance1.start()
             
-    elif example == 2:
-        instance1 = RemovePointsRect(points, plot, 15, addline=True, verbose=True)
-        instance1.start()
+            instance2 = RemovePointsClick(polyline1, plot, 15, pclr=(0,0,90,255), verbose=True)
+            instance2.start()
+                
+        elif example == 2:
+            instance1 = RemovePointsRect(points, plot, 15, addline=True, verbose=True)
+            instance1.start()
+            
+            instance2 = RemovePointsRect(polyline2, plot, 15, pclr=(0,0,90,255), addline=True, verbose=True)
+            instance2.start()
+            
+            instance3 = RemovePointsRect(polyline3, plot, 15, pclr=(0,100,90,255), verbose=True)
+            instance3.start()
+            
+        elif example == 3:
+            instance1 = MovePoint(points, plot, 15, pclr=(150,0,150,255), verbose=True, addline=True)
+            instance1.start()
+            
+            instance2 = MovePoint(polyline2, plot, 15, verbose=True)
+            instance2.start()
+            
+            instance3 = MovePoint(polyline3, plot, 15, lclr=(0,200,10,255), pclr=(200,200,0,255), verbose=True, addline=True)
+            instance3.start()
+            
+        elif example == 4:
+            instance1 = AddPointOnLine(points, plot, 15, verbose=True)
+            instance1.start()
+            
+            instance2 = AddPointOnLine(polyline3, plot, 15, lclr=(100,50,10,255), pclr=(0,200,100,255), hlclr=(0, 150, 150, 255), verbose=True)
+            instance2.start()
+    
+        elif example == 5:
+            instance1 = RemovePolyline([points, polyline1, polyline2, polyline3], plot, 15, verbose=True)
+            instance1.start()
+            
+            # instance2 = RemovePolyline([polyline3], plot, 15, lclr=(100,50,10,255), pclr=(0,200,100,255), hlclr=(0, 150, 150, 255), verbose=True)
+            # instance2.start()
+    
+        elif example == 6:
+            instance1 = DrawPolyline([points, polyline2, polyline3], plot, 15, verbose=True)
+            instance1.start()
+            
+        elif example == 7:
+            instance1 = JoinPolylines([points, polyline2, polyline3], plot, 15, verbose=True)
+            instance1.start()
         
-        instance2 = RemovePointsRect(polyline2, plot, 15, pclr=(0,0,90,255), addline=True, verbose=True)
-        instance2.start()
+        elif example == 8:
+            pass
+        elif example == 9:
+            pass
+        elif example == 10:
+            pass
+    
+        QtGui.QApplication.instance().exec_()
+    
+    
+    else:
         
-        instance3 = RemovePointsRect(polyline3, plot, 15, pclr=(0,100,90,255), verbose=True)
-        instance3.start()
+        from PyQt5 import QtWidgets  #, QtCore
+        from PyQt5.QtWidgets import QApplication, QMainWindow #, QFileDialog, QMessageBox, QDialog
+        from PyQt5.QtCore import Qt
+        import pyqtgraph as pg
+        from pyqtgraph import GraphicsLayoutWidget
+        import sys
         
-    elif example == 3:
-        instance1 = MovePoint(points, plot, 15, pclr=(150,0,150,255), verbose=True, addline=True)
-        instance1.start()
         
-        instance2 = MovePoint(polyline2, plot, 15, verbose=True)
-        instance2.start()
+        class Window(QMainWindow):
+            def __init__(self):
+                super(Window, self).__init__()
+                # Setup the QMainWindow
+                self.setWindowTitle('All the tools in action!!')
+                self.resize(700, 600)
+                # Setup the central widget
+                self.centralwidget = QtWidgets.QWidget(self)
+                self.setCentralWidget(self.centralwidget)
+                self.centralwidget.setStyleSheet("background-color: rgb(150, 150, 150);")
+                # Add the vertical layout
+                self.vlayout = QtWidgets.QVBoxLayout(self.centralwidget)
+                # Create and nest two horizontal layouts in the vertical layout
+                self.hlayout1 = QtWidgets.QHBoxLayout()
+                self.vlayout.addLayout(self.hlayout1)
+                self.hlayout2 = QtWidgets.QHBoxLayout()
+                self.vlayout.addLayout(self.hlayout2)
+                # Set the layout of the central widget
+                self.centralwidget.setLayout(self.vlayout)
+                # Create items to be added in the layouts
+                # They could be also added directly using e.g. self.vlayout.addWidget(self.myNewWidget)
+                self.glwidget = GraphicsLayoutWidget()  # This is an item from pyqtgraph
+                self.glwidget.setBackground((54, 54, 54))
+                self.glwidget.setEnabled(True)  # Make sure it is enabled (maybe useless line of code)
+                self.btn1 = QtWidgets.QPushButton('Start editing')
+                self.btn2 = QtWidgets.QPushButton('Save changes')
+                self.btn3 = QtWidgets.QPushButton('Discard changes')
+                self.btn2.setEnabled(False)
+                self.btn3.setEnabled(False)
+                self.radio1 = QtWidgets.QRadioButton('Points/Centroids example')
+                self.radio2 = QtWidgets.QRadioButton('Polylines example')
+                self.radio2.setChecked(True)
+                # Add items to the layouts
+                self.hlayout1.addWidget(self.btn1)
+                self.hlayout1.addWidget(self.btn2)
+                self.hlayout1.addWidget(self.btn3)
+                self.hlayout1.addWidget(self.radio1)
+                self.hlayout1.addWidget(self.radio2)
+                self.hlayout1.addStretch(1)
+                self.hlayout2.addWidget(self.glwidget)
+                # Add a PlotItem to the pyqtgraph GraphicsLayoutWidget and set it up
+                self.plot2d = self.glwidget.addPlot()
+                self.plot2d.setAspectLocked(lock=True)
+                self.plot2d.setTitle('PRESS ENTER')
+                
+                # Generate some random initial points and polylines
+                self.npoints = 500
+                self.points = np.hstack((np.random.random(self.npoints).reshape(self.npoints, 1)*20, np.random.random(self.npoints).reshape(self.npoints, 1)*20))
+                
+                self.nverts = 15
+                self.polyline1 = np.hstack((np.arange(self.nverts).reshape(self.nverts, 1)*10, np.random.random(self.nverts).reshape(self.nverts, 1)*10))
+                self.polyline2 = self.polyline1 + 50
+                self.polyline3 = self.polyline2 + 70
+                self.polylines = [self.polyline1, self.polyline2, self.polyline3]
+                
+                # Set some default variables
+                self.initialized = False
+                self.editing = False
+                self.polylinesTool = 'draw'
+                self.pointsTool = 'remove'
+                
+                # Connect signals
+                self.btn1.clicked.connect(self.editMode)
+                self.radio1.clicked.connect(self.plotStaticData)
+                self.radio2.clicked.connect(self.plotStaticData)
+                
+                
+                
+ 
+            # d draw, j join, r removePolyline, a addPoint, m movePoint, p removePoints
         
-        instance3 = MovePoint(polyline3, plot, 15, lclr=(0,200,10,255), pclr=(200,200,0,255), verbose=True, addline=True)
-        instance3.start()
-        
-    elif example == 4:
-        instance1 = AddPointOnLine(points, plot, 15, verbose=True)
-        instance1.start()
-        
-        instance2 = AddPointOnLine(polyline3, plot, 15, lclr=(100,50,10,255), pclr=(0,200,100,255), hlclr=(0, 150, 150, 255), verbose=True)
-        instance2.start()
+            
+            def keyPressEvent(self, event):
+                if self.editing:
+                    self.plot2d.clear()
+                    self.tempPolylines = []
+                    for edI in self.editInstance:
+                        edI.stop()
+                        if self.polylinesTool in ['addponline', 'movepoint']:
+                            self.tempPolylines.append(edI.pll)
+                        elif self.polylinesTool in ['removepoint']:
+                            self.tempPolylines.append(edI.pts_b)
+                        else:
+                            self.tempPolylines = edI.plls
+                            
+                    if self.radio2.isChecked():
+                        if event.key() == Qt.Key_D:
+                            self.polylinesTool = 'draw'
+                            self.editInstance = [DrawPolyline(self.tempPolylines, self.plot2d, 10)]
+                        elif event.key() == Qt.Key_J:
+                            self.polylinesTool = 'join'
+                            self.editInstance = [JoinPolylines(self.tempPolylines, self.plot2d, 10)]
+                        elif event.key() == Qt.Key_R:
+                            self.polylinesTool = 'rempoly'
+                            self.editInstance = [RemovePolyline(self.tempPolylines, self.plot2d, 10)]
+                        elif event.key() == Qt.Key_A:
+                            self.polylinesTool = 'addponline'
+                            self.editInstance = [AddPointOnLine(pll, self.plot2d, 10) for pll in self.tempPolylines]
+                        elif event.key() == Qt.Key_M:
+                            self.polylinesTool = 'movepoint'
+                            self.editInstance = [MovePoint(pll, self.plot2d, 10, addline=True) for pll in self.tempPolylines]
+                        elif event.key() == Qt.Key_P:
+                            self.polylinesTool = 'removepoint'
+                            self.editInstance = [RemovePointsRect(pll,self.plot2d, 10, addline=True) for pll in self.tempPolylines]
+                    if self.radio1.isChecked():
+                        pass
+                    for edI in self.editInstance:
+                        edI.start()
+                
+                elif event.key() == Qt.Key_Return and self.initialized == False:
+                    self.plotStaticData()
+                    self.plot2d.setTitle('')
+                    self.initialized = True
+                
+              
 
-    elif example == 5:
-        instance1 = RemovePolyline([points, polyline1, polyline2, polyline3], plot, 15, verbose=True)
-        instance1.start()
-        
-        # instance2 = RemovePolyline([polyline3], plot, 15, lclr=(100,50,10,255), pclr=(0,200,100,255), hlclr=(0, 150, 150, 255), verbose=True)
-        # instance2.start()
+            def save_changes(self):
+                pass
+            
+            
+            def discard_changes(self):
+                pass
+            
+            
+            def editMode(self):
+                self.plot2d.clear()
+                self.editing = True
+                self.btn1.setEnabled(False)
+                self.btn2.setEnabled(True)
+                self.btn3.setEnabled(True)
+                self.radio1.setEnabled(False)
+                self.radio2.setEnabled(False)
+                if self.radio2.isChecked():
+                    self.tempPolylines = self.polylines
+                    self.polylinesTool = 'draw'
+                    self.editInstance = [DrawPolyline(self.tempPolylines, self.plot2d, 10)]
+                    self.editInstance[0].start()
+                elif self.radio1.isChecked():
+                    self.tempPoints = self.points
+                    self.pointsTool = 'remove'
+                    self.editInstance = [RemovePointsClick(self.tempPoints, self.plot2d, 10)]
+                    self.editInstance[0].start()
+                    
+                    
 
-    elif example == 6:
-        instance1 = DrawPolyline([points, polyline2, polyline3], plot, 15, verbose=True)
-        instance1.start()
+            
         
-    elif example == 7:
-        instance1 = JoinPolylines([points, polyline2, polyline3], plot, 15, verbose=True)
-        instance1.start()
         
-    elif example == 8:
-        pass
 
-    QtGui.QApplication.instance().exec_()
+            def plotStaticData(self):
+                self.plot2d.clear()
+                if self.radio2.isChecked():
+                    self.CurveItems = {}
+                    for i in range(len(self.polylines)):
+                        CurveItem = pg.PlotCurveItem(
+                        pen=pg.mkPen(color=(200, 200, 0, 255), width=3))
+                        CurveItem.setData(self.polylines[i][:, 0], self.polylines[i][:, 1])
+                        self.plot2d.addItem(CurveItem)
+                        self.CurveItems[i] = CurveItem
+                    # Plot vertices
+                    polylines_linked = self.polylines[0]
+                    for pll in self.polylines[1:]:
+                        polylines_linked = np.vstack((polylines_linked, pll))
+                    # Plot points at the vertices of the polylines
+                    self.ScatterItem = pg.ScatterPlotItem(pxMode=True, size=10, brush=pg.mkBrush(100, 50, 0, 255))
+                    self.ScatterItem.setData(polylines_linked[:, 0], polylines_linked[:, 1])
+                    self.plot2d.addItem(self.ScatterItem)
+                        
+                elif self.radio1.isChecked():
+                    self.ScatterItem = pg.ScatterPlotItem(pxMode=True, size=10, brush=pg.mkBrush(200, 200, 0, 255))
+                    self.ScatterItem.setData(self.points[:, 0], self.points[:, 1])
+                    self.plot2d.addItem(self.ScatterItem)
+                
+                
+                
+                
+           
+            
+
+        app = QApplication(sys.argv)
+        win = Window()
+        win.show()
+        sys.exit(app.exec_())
 
 
 
