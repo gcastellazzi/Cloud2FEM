@@ -323,6 +323,7 @@ class Window(QMainWindow):
 
 
     def genslices_clicked(self):
+        self.plot2d.vb.enableAutoRange()
         a = self.lineEdit_from.text()
         b = self.lineEdit_to.text()
         c = self.lineEdit_steporN.text()
@@ -382,6 +383,7 @@ class Window(QMainWindow):
             x = msg_slices2.exec_()
 
     def gencentr_clicked(self):
+        self.plot2d.vb.enableAutoRange()
         try:
             minwthick = float(self.lineEdit_wall_thick.text())
             
@@ -409,6 +411,7 @@ class Window(QMainWindow):
             x = msg_centr.exec_()
 
     def genpolylines_clicked(self):
+        self.plot2d.vb.enableAutoRange()
         minwthick = float(self.lineEdit_wall_thick.text())
         
         mct.polys, mct.cleanpolys = cp.make_polylines(minwthick, mct.zcoords, mct.ctrds)
@@ -428,6 +431,7 @@ class Window(QMainWindow):
         x = msg_polysok.exec_()
 
     def genpolygons_clicked(self):
+        self.plot2d.vb.enableAutoRange()
         minwthick = float(self.lineEdit_wall_thick.text())
         
         mct.polygs, invalidpolygons = cp.make_polygons(minwthick, mct.zcoords, mct.cleanpolys)
@@ -813,7 +817,8 @@ class Window(QMainWindow):
                     if self.polylinesTool in ['addponline', 'movepoint']:
                         self.tempPolylines.append(edI.pll)
                     elif self.polylinesTool in ['removepoint']:
-                        self.tempPolylines.append(edI.pts_b)
+                        if edI.pts_b.shape[0] != 0:  # Remove empty array when a polyline is completely deleted removing its points
+                            self.tempPolylines.append(edI.pts_b)
                     else:
                         self.tempPolylines = edI.plls
                 if event.key() == Qt.Key_D:
@@ -856,6 +861,17 @@ class Window(QMainWindow):
                     self.plot2d.setTitle('R remove points (click), <strong><u><big><mark>P remove points (rect selection)</strong>')
                     self.pointsTool = 'removerect'
                     self.editInstance = [ptd.RemovePointsRect(self.tempPoints, self.plot2d, 10)]
+            elif self.emode == 'centroids':
+                self.plot2d.clear()
+                self.tempCentroids = self.editInstance[0].pts_b
+                if event.key() == Qt.Key_R:
+                    self.plot2d.setTitle('<strong><u><big><mark>R remove points (click)</strong>, P remove points (rect selection)')
+                    self.pointsTool = 'remove'
+                    self.editInstance = [ptd.RemovePointsClick(self.tempCentroids, self.plot2d, 10)]
+                elif event.key() == Qt.Key_P:
+                    self.plot2d.setTitle('R remove points (click), <strong><u><big><mark>P remove points (rect selection)</strong>')
+                    self.pointsTool = 'removerect'
+                    self.editInstance = [ptd.RemovePointsRect(self.tempCentroids, self.plot2d, 10)]
       
             for edI in self.editInstance:
                 edI.start()
@@ -907,7 +923,8 @@ class Window(QMainWindow):
                 if self.polylinesTool in ['addponline', 'movepoint']:
                     self.tempPolylines.append(edI.pll)
                 elif self.polylinesTool in ['removepoint']:
-                    self.tempPolylines.append(edI.pts_b)
+                    if edI.pts_b.shape[0] != 0:  # Remove empty array when a polyline is completely deleted removing its points
+                        self.tempPolylines.append(edI.pts_b)
                 else:
                     self.tempPolylines = edI.plls      
             # self.polylines = self.tempPolylines
@@ -947,6 +964,7 @@ class Window(QMainWindow):
         self.btn_edit_finalize.setEnabled(False)
         self.btn_edit_discard.setEnabled(False)
         self.gui_edit_status(True)
+        self.lineEdit_off.setEnabled(False)
         self.plot2d.setTitle('')
         self.plot2d.clear()
         self.main2dplot()
@@ -978,6 +996,7 @@ class Window(QMainWindow):
         self.btn_edit_finalize.setEnabled(False)
         self.btn_edit_discard.setEnabled(False)
         self.gui_edit_status(True)
+        self.lineEdit_off.setEnabled(False)
         self.plot2d.setTitle('')
         self.plot2d.clear()
         self.main2dplot()

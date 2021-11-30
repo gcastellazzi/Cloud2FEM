@@ -1027,8 +1027,11 @@ class OffsetPolyline:
                     self.CurveItems[key].setPen(pg.mkPen(color=self.hlclr, width=self.lwdth*1.3))
                     self.tomodify = key  # Dict's key of the selected segment where to add a point (after a click)
                     # Draw temporary offset polyline
-                    tempOff = np.array(LineString(self.plls[self.tomodify]).parallel_offset(np.absolute(self.offset), side=self.side, resolution=5, join_style=2, mitre_limit=5))
-                    self.tempOff.setData(tempOff[:, 0], tempOff[:, 1])
+                    try:
+                        tempOff = np.array(LineString(self.plls[self.tomodify]).parallel_offset(np.absolute(self.offset), side=self.side, resolution=5, join_style=2, mitre_limit=5))
+                        self.tempOff.setData(tempOff[:, 0], tempOff[:, 1])
+                    except IndexError:
+                        continue  # Probably this error happens because of weird data collected by mistake by the mouse
                     found = True
                 else:
                     self.CurveItems[key].setPen(pg.mkPen(color=self.lclr, width=self.lwdth))
@@ -1055,10 +1058,11 @@ class OffsetPolyline:
             
             
             newpoly = np.array(LineString(self.plls[self.tomodify]).parallel_offset(np.absolute(self.offset), side=self.side, resolution=5, join_style=2, mitre_limit=5))
-            if self.side == 'left':
-                self.plls.append(newpoly)
-            elif self.side == 'right':  # Shapely flips the array if side == right
-                self.plls.append(np.flip(newpoly, axis=0))
+            if len(newpoly) >= 2:  # Offset of a closed polyline could result in a empty array
+                if self.side == 'left':
+                    self.plls.append(newpoly)
+                elif self.side == 'right':  # Shapely flips the array if side == right
+                    self.plls.append(np.flip(newpoly, axis=0))
             
             # Update the polyline attribute self.pll with the new reassembled one
             if self.verbose:
@@ -1118,15 +1122,21 @@ class OffsetPolyline:
             pen=pg.mkPen(color=self.lclr, width=self.lwdth))
             CurveItem.setClickable(False, width=7)
             #### CurveItem.setSkipFiniteCheck(True)   ## Needed recent version of pyqtgraph
-            CurveItem.setData(self.plls[i][:, 0], self.plls[i][:, 1])
-            self.PlotItem.addItem(CurveItem)
-            self.CurveItems[i] = CurveItem
+            try:
+                CurveItem.setData(self.plls[i][:, 0], self.plls[i][:, 1])
+                self.PlotItem.addItem(CurveItem)
+                self.CurveItems[i] = CurveItem
+            except IndexError:
+                continue  # This happens when messing up with offset
             
         # This invisible_polyline avoids to keep looping
         # on all the polylines when the mouse pointer is far from them
         polylines_linked = self.plls[0]
         for pll in self.plls[1:]:
-            polylines_linked = np.vstack((polylines_linked, pll))
+            try:
+                polylines_linked = np.vstack((polylines_linked, pll))
+            except ValueError:
+                continue  # This happens when trying to offset a "closed" concave polyline
         self.invisible_polyline = pg.PlotCurveItem(
             pen=pg.mkPen((255, 255, 0, 0), width=1))
         self.invisible_polyline.setClickable(False, width=100)
@@ -1205,7 +1215,7 @@ if __name__ == "__main__":
     # 9:  ////////////////
     # 10: ////////////////
     # 11: All the examples together in a simple PyQt5 gui app
-    example = 8
+    example = 11
     
     
     points = np.array([[0, 0], [0, 1], [0, 2], [1, 0], [1, 1], [1, 2], [2, 0], [2, 1], [2, 2]]).astype(dtype=np.float32, copy=False) * 10
@@ -1400,7 +1410,8 @@ if __name__ == "__main__":
                             if self.polylinesTool in ['addponline', 'movepoint']:
                                 self.tempPolylines.append(edI.pll)
                             elif self.polylinesTool in ['removepoint']:
-                                self.tempPolylines.append(edI.pts_b)
+                                if edI.pts_b.shape[0] != 0:  # Remove empty array when a polyline is completely deleted removing its points
+                                    self.tempPolylines.append(edI.pts_b)
                             else:
                                 self.tempPolylines = edI.plls
                         if event.key() == Qt.Key_D:
