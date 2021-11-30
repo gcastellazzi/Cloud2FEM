@@ -17,62 +17,61 @@ from shapely.geometry import LineString
 
 
 
+# ## Do not use, probably it is more convenient to use PlotCurveItems as I did
+# ## in the main file. This allows to add the items to a list to be able to
+# ## remove only certain items from the plot, instead of PlotItem.clear() everything
 
-def plot_grid(PlotItem, xdim, ydim, xmin, xmax, ymin, ymax):
-    """
-    Plots a grid whose space between lines is given by xdim and ydim,
-    the other quantities define the extension of the grid.
-    An example of PlotItem is:
-    a = GraphicsLayoutWidget (from pyqtgraph)
-    PlotItem = a.addPlot()
-    """
-    xngrid = np.arange(xmin - xdim, xmax + 2 * xdim, xdim)
-    yngrid = np.arange(ymin - ydim, ymax + 2 * ydim, ydim)
-    penna = pg.mkPen(color=(220, 220, 220, 255), width=1.5)
-    for x in xngrid:
-        PlotItem.plot((x, x), (min(yngrid), max(yngrid)), pen=penna)
-    for y in yngrid:
-        PlotItem.plot((min(xngrid), max(xngrid)), (y, y), pen=penna)
-        
-
-
-
-
-def plot_scatter(PlotItem, points, sz=5, clr=(0, 0, 0, 255)):
-    """
-    points : np.array([[x1, y1], [x2, y2], ..., [xn, yn]])
-    sz     : size of the points
-    clr    : color (r, g, b, alpha)
-    Plot points on the PlotItem.
-    """
-    scatter2d = pg.ScatterPlotItem(pos=points, size=sz, brush=pg.mkBrush(clr))
-    PlotItem.addItem(scatter2d)
-
-
-
-
-
-def plot_polylines(PlotItem, polylines, wd=3, clr=(50, 50, 50, 255), rainbow=False, points=False):
-    """
-    wd         : width of the points
-    clr        : color (r, g, b, alpha)
-    polylines  : list [poly1, poly2,...., ]  
-                 where polyn=np.array([[x1, y1], [x2, y2], ...,[xn, yn]])
-    Plot list of polylines on the PlotItem
-    """
-    for poly in polylines:
-        if rainbow == False:
-            PlotItem.plot(poly[:, : 2], pen=pg.mkPen(color=clr, width=wd))
-        elif rainbow == True:
-            colr = np.random.randint(50, 255)
-            colg = np.random.randint(50, 255)
-            colb = np.random.randint(50, 255)
-            PlotItem.plot(poly[:, : 2], pen=pg.mkPen(color=(colr, colg, colb, 255), width=wd))
-        if points == True:
-            pts = pg.ScatterPlotItem(pos=poly[:, : 2], size=9, brush=pg.mkBrush(255, 0, 0, 255), symbol='s')
-            PlotItem.addItem(pts)
-
-
+# def plot_grid(PlotItem, xdim, ydim, xmin, xmax, ymin, ymax):
+#     """
+#     Plots a grid whose space between lines is given by xdim and ydim,
+#     the other quantities define the extension of the grid.
+#     An example of PlotItem is:
+#     a = GraphicsLayoutWidget (from pyqtgraph)
+#     PlotItem = a.addPlot()
+#     """
+#     xngrid = np.arange(xmin - xdim, xmax + 2 * xdim, xdim)
+#     yngrid = np.arange(ymin - ydim, ymax + 2 * ydim, ydim)
+#     penna = pg.mkPen(color=(220, 220, 220, 255), width=1.5)
+#     for x in xngrid:
+#         PlotItem.plot((x, x), (min(yngrid), max(yngrid)), pen=penna)
+#     for y in yngrid:
+#         PlotItem.plot((min(xngrid), max(xngrid)), (y, y), pen=penna)
+#     
+#
+# def plot_scatter(PlotItem, points, sz=5, clr=(0, 0, 0, 255)):
+#     """
+#     points : np.array([[x1, y1], [x2, y2], ..., [xn, yn]])
+#     sz     : size of the points
+#     clr    : color (r, g, b, alpha)
+#     Plot points on the PlotItem.
+#     """
+#     scatter2d = pg.ScatterPlotItem(pos=points, size=sz, brush=pg.mkBrush(clr))
+#     PlotItem.addItem(scatter2d)
+#
+# 
+# ## Do not use, probably it is more convenient to use PlotCurveItems as I did
+# ## in the main file. This allows to add the items to a list to be able to
+# ## remove only certain items from the plot, instead of .clear() everything
+#
+# def plot_polylines(PlotItem, polylines, wd=3, clr=(50, 50, 50, 255), rainbow=False, points=False):
+#     """
+#     wd         : width of the points
+#     clr        : color (r, g, b, alpha)
+#     polylines  : list [poly1, poly2,...., ]  
+#                   where polyn=np.array([[x1, y1], [x2, y2], ...,[xn, yn]])
+#     Plot list of polylines on the PlotItem
+#     """
+#     for poly in polylines:
+#         if rainbow == False:
+#             PlotItem.plot(poly[:, : 2], pen=pg.mkPen(color=clr, width=wd))
+#         elif rainbow == True:
+#             colr = np.random.randint(50, 255)
+#             colg = np.random.randint(50, 255)
+#             colb = np.random.randint(50, 255)
+#             PlotItem.plot(poly[:, : 2], pen=pg.mkPen(color=(colr, colg, colb, 255), width=wd))
+#         if points == True:
+#             pts = pg.ScatterPlotItem(pos=poly[:, : 2], size=9, brush=pg.mkBrush(255, 0, 0, 255), symbol='s')
+#             PlotItem.addItem(pts)
 
 
 
@@ -1056,7 +1055,10 @@ class OffsetPolyline:
             
             
             newpoly = np.array(LineString(self.plls[self.tomodify]).parallel_offset(np.absolute(self.offset), side=self.side, resolution=5, join_style=2, mitre_limit=5))
-            self.plls.append(newpoly)
+            if self.side == 'left':
+                self.plls.append(newpoly)
+            elif self.side == 'right':  # Shapely flips the array if side == right
+                self.plls.append(np.flip(newpoly, axis=0))
             
             # Update the polyline attribute self.pll with the new reassembled one
             if self.verbose:
@@ -1203,7 +1205,7 @@ if __name__ == "__main__":
     # 9:  ////////////////
     # 10: ////////////////
     # 11: All the examples together in a simple PyQt5 gui app
-    example = 11
+    example = 8
     
     
     points = np.array([[0, 0], [0, 1], [0, 2], [1, 0], [1, 1], [1, 2], [2, 0], [2, 1], [2, 2]]).astype(dtype=np.float32, copy=False) * 10
@@ -1274,7 +1276,7 @@ if __name__ == "__main__":
             instance1.start()
         
         elif example == 8:
-            instance1 = OffsetPolyline([points], plot, 15, -1, verbose=True)
+            instance1 = OffsetPolyline([points], plot, 15, 1, verbose=True)
             instance1.start()
             
             
@@ -1439,7 +1441,7 @@ if __name__ == "__main__":
                             self.editInstance = [RemovePointsClick(self.tempPoints, self.plot2d, 10)]
                         elif event.key() == Qt.Key_P:
                             self.plot2d.setTitle('R remove points (click), <strong><u><big><mark>P remove points (rect selection)</strong>')
-                            self.polylinesTool = 'removerect'
+                            self.pointsTool = 'removerect'
                             self.editInstance = [RemovePointsRect(self.tempPoints, self.plot2d, 10)]
               
                     for edI in self.editInstance:
@@ -1482,6 +1484,8 @@ if __name__ == "__main__":
                     self.inputText.setEnabled(False)
 
                 elif self.radio1.isChecked():
+                    for edI in self.editInstance:
+                        edI.stop()
                     self.points = self.editInstance[0].pts_b
                     self.pointsTool = 'remove'
                     self.plotStaticData()
@@ -1543,7 +1547,7 @@ if __name__ == "__main__":
                 elif self.radio1.isChecked():
                     self.plot2d.setTitle('R remove points (click), <strong><u><big><mark>P remove points (rect selection)</strong>')
                     self.tempPoints = self.points.copy()
-                    self.polylinesTool = 'removerect'
+                    self.pointsTool = 'removerect'
                     self.editInstance = [RemovePointsRect(self.tempPoints, self.plot2d, 10)]
                     self.editInstance[0].start()
                     
