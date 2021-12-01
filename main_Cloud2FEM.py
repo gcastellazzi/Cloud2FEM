@@ -715,7 +715,7 @@ class Window(QMainWindow):
             self.editInstance = [ptd.RemovePointsRect(self.tempCentroids, self.plot2d, 10)]
             self.editInstance[0].start()
         elif self.radioPolylines.isChecked():
-            self.plot2d.setTitle('<strong><u><big><mark>D draw</strong>, J join, R remove polyline, A add point,  move point, P remove points')
+            self.plot2d.setTitle('<strong><u><big><mark>D draw</strong>, J join, R remove polyline, A add point,  move point, P remove points, O offset')
             self.emode = 'polylines'
             self.polylinesTool = 'draw'
             self.tempPolylines = mct.cleanpolys[mct.zcoords[self.combo_slices.currentIndex()]].copy()

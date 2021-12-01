@@ -1217,7 +1217,7 @@ if __name__ == "__main__":
     # 11: All the examples together in a simple PyQt5 gui app
     example = 11
     
-    
+    # Define some test data
     points = np.array([[0, 0], [0, 1], [0, 2], [1, 0], [1, 1], [1, 2], [2, 0], [2, 1], [2, 2]]).astype(dtype=np.float32, copy=False) * 10
     polyline1 = np.array([[0, 0], [5, 1], [10, 5], [15, 3], [20, 10], [25, 7], [30, 7], [35, 15], [40, 9], [50, 0]]).astype(dtype=np.float32, copy=False)
     polyline2 = polyline1 + 30
@@ -1550,7 +1550,7 @@ if __name__ == "__main__":
                 self.radio1.setEnabled(False)
                 self.radio2.setEnabled(False)
                 if self.radio2.isChecked():
-                    self.plot2d.setTitle('<strong><u><big><mark>D draw</strong>, J join, R remove polyline, A add point,  move point, P remove points')
+                    self.plot2d.setTitle('<strong><u><big><mark>D draw</strong>, J join, R remove polyline, A add point,  move point, P remove points, O offset')
                     self.tempPolylines = self.polylines.copy()
                     self.polylinesTool = 'draw'
                     self.editInstance = [DrawPolyline(self.tempPolylines, self.plot2d, 10)]
