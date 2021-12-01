@@ -154,7 +154,7 @@ def find_centroids(minwthick, zcoords, slices, tolsl=10, tolpt=2, tol=0.01, chec
 
 
 
-def make_polylines(minwthick, zcoords, ctrds, prcnt=5, minctrd=2, simpl_tol=0.025):
+def make_polylines(minwthick, zcoords, ctrds, prcnt=1, minctrd=2, simpl_tol=0.025):
     """
     minwthick: Minimum wall thickness
     zcoords  : 1-d np array of z coords as that returned by func "make_zcoords()"
@@ -301,7 +301,7 @@ def export_dxf(zcoords, polygs, filepath):
     """
     This function saves a dxf file of hatches in the filepath.
     Once in AutoCAD, polylines can be retrieved using the command
-    'hatchgenerateboudnary'
+    'hatchgenerateboundary'
     """
     dxfdoc = ezdxf.new('R2013')
     msp = dxfdoc.modelspace()
