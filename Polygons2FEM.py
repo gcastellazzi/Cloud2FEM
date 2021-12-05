@@ -59,16 +59,23 @@ def make_mesh(xeldim, yeldim, xmin, ymin, xmax, ymax, zcoords, polygs):
     # whose generic row represents an element=[xelgridID, yelgridID]
     t0 = time.time()
     elemlist = {}
+    tot_elements = 0  # Total number of elements
     for z in zcoords:
         initstack = 0
         for x in range(len(xelgrid)):
             for y in range(len(yelgrid)):
                 if polygs[z].contains(sg.Point(xelgrid[x], yelgrid[y])):
                     if initstack != 0:
-                        elemlist[z] = np.vstack((elemlist[z], np.array([x, y])))
+                        # elemlist[z] = np.vstack((elemlist[z], np.array([x, y]))) # Python .append is much faster than np.vstack
+                        elemlist[z].append([x, y])
+                        tot_elements += 1
                     else:
-                        elemlist[z] = np.array([[x, y]])
+                        # elemlist[z] = np.array([[x, y]])  # Python .append is much faster than np.vstack
+                        elemlist[z] = [[x, y]]
                         initstack += 1
+                        tot_elements += 1
+        elemlist[z] = np.array(elemlist[z])
+    print('Total number of elements: ', tot_elements)
     t1 = time.time()
     t = t1 - t0
     print('Shapely code, elapsed time:  ', str(t))
@@ -94,7 +101,7 @@ def make_mesh(xeldim, yeldim, xmin, ymin, xmax, ymax, zcoords, polygs):
             elh = crntz - zcoords[z-1]  # Height of the elements of the last slice
         
         
-        z_elconnect = []  ################ TEST FOR VSTACK NEW ELEMENTS  .... Initialize connectivity for the current slice
+        z_elconnect = []  # Initialize connectivity for the current slice
         c_info = 0          # Just a counter used to print info at runtime
         
         for elem in elemlist[zcoords[z]]:
@@ -153,7 +160,9 @@ def make_mesh(xeldim, yeldim, xmin, ymin, xmax, ymax, zcoords, polygs):
                         elif ignoring == 0:
                             tempel.append(nodelist[nexists, 0][0])
                     else:
-                        nodelist = np.vstack((nodelist, tempn))
+                        # nodelist = np.vstack((nodelist, tempn))
+                        nodelist[nodeID - 1] = tempn
+                        
                         tempel.append(nodeID)
                         nodeID += 1
                         zignore += 1
@@ -161,13 +170,20 @@ def make_mesh(xeldim, yeldim, xmin, ymin, xmax, ymax, zcoords, polygs):
                 elif elID == 1:
                     # The 8 lines of code below are used only for the first defined element
                     if nodeID == 1:
-                        nodelist = np.array([tempn])  # Store the first line of the node list
+                        # nodelist = np.array([tempn])  # Store the first line of the node list
+                        nodelist = np.array([[None, None, None, None]] * tot_elements * 8).astype(np.float32, copy=False)
+                        nodelist[nodeID - 1] = tempn
+                        
                         tempel.append(nodeID)         # Add the nodeID to the temporary row of the connectivity matrix
                         nodeID += 1
+                        zignore += 1
                     else:
-                        nodelist = np.vstack((nodelist, tempn)) # Store other lines of the node list (2nd to 8th)
+                        # nodelist = np.vstack((nodelist, tempn)) # Store other lines of the node list (2nd to 8th)
+                        nodelist[nodeID - 1] = tempn
+                        
                         tempel.append(nodeID)                   # Add the nodeID to the temporary row of the connectivity matrix    
                         nodeID += 1
+                        zignore += 1
 
             # Add new elements to z_elconnect
             z_elconnect.append(tempel)
@@ -176,7 +192,8 @@ def make_mesh(xeldim, yeldim, xmin, ymin, xmax, ymax, zcoords, polygs):
         # Add z_elconnect to the list that contains all the elements
         elconnect += z_elconnect
         ignore.append(zignore)
-
+    
+    nodelist = nodelist[~np.isnan(nodelist[:, 0])]
     elconnect = np.array(elconnect)
     t1 = time.time()
     t = t1 - t0
