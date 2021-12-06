@@ -62,7 +62,6 @@ def make_mesh(xeldim, yeldim, xmin, ymin, xmax, ymax, zcoords, polygs):
     tot_elements = 0  # Total number of elements
     print('Searching for "pixels" inside polygons...')
     for z in zcoords:
-        # print('Slice ', z, ': searching for "pixels" inside polygons')
         initstack = 0
         for x in range(len(xelgrid)):
             for y in range(len(yelgrid)):
@@ -92,7 +91,7 @@ def make_mesh(xeldim, yeldim, xmin, ymin, xmax, ymax, zcoords, polygs):
     ignore = []             # Initialize  the n° nodes to ignore when comparing
     zignore = 0             # Initialize nodes found in the current slice that will be ignored later
     
-    arr_dim = 0.5          # Percentage used to update the length of the nodelist numpy array
+    arr_dim = 0.5           # Percentage used to update the length of the nodelist numpy array
 
     for z in range(len(zcoords)):
         crntz = zcoords[z]              # Current z
@@ -106,13 +105,8 @@ def make_mesh(xeldim, yeldim, xmin, ymin, xmax, ymax, zcoords, polygs):
         
         
         z_elconnect = []  # Initialize connectivity for the current slice
-        # c_info = 0          # Just a counter used to print info at runtime
         
         for elem in elemlist[zcoords[z]]:
-            # Print info message
-            # c_info += 1
-            # if c_info % 1000 == 0:
-            #     print('Zcoord: ', zcoords[z], ', element', c_info, ' of ', elemlist[zcoords[z]].shape[0])
             
             tempel = [elID]  # To be filled: temporary row of the connectivity matrix
             
@@ -164,10 +158,9 @@ def make_mesh(xeldim, yeldim, xmin, ymin, xmax, ymax, zcoords, polygs):
                         elif ignoring == 0:
                             tempel.append(nodelist[nexists, 0][0])
                     else:
-                        # nodelist = np.vstack((nodelist, tempn))
                         try:
                             nodelist[nodeID - 1] = tempn
-                        except IndexError:
+                        except IndexError:  # If the length of nodelist is not enough, add to it another piece with nan values
                             nodelist = np.vstack((nodelist, np.array([[None, None, None, None]] * int(tot_elements * arr_dim)).astype(np.float32, copy=False)))
                             nodelist[nodeID - 1] = tempn
                             
@@ -176,9 +169,8 @@ def make_mesh(xeldim, yeldim, xmin, ymin, xmax, ymax, zcoords, polygs):
                         zignore += 1
 
                 elif elID == 1:
-                    # The 8 lines of code below are used only for the first defined element
+                    # The lines of code below are used only for the first defined element
                     if nodeID == 1:
-                        # nodelist = np.array([tempn])  # Store the first line of the node list
                         nodelist = np.array([[None, None, None, None]] * int(tot_elements * arr_dim)).astype(np.float32, copy=False)
                         nodelist[nodeID - 1] = tempn
                         
@@ -186,10 +178,9 @@ def make_mesh(xeldim, yeldim, xmin, ymin, xmax, ymax, zcoords, polygs):
                         nodeID += 1
                         zignore += 1
                     else:
-                        # nodelist = np.vstack((nodelist, tempn)) # Store other lines of the node list (2nd to 8th)
                         nodelist[nodeID - 1] = tempn
                         
-                        tempel.append(nodeID)                   # Add the nodeID to the temporary row of the connectivity matrix    
+                        tempel.append(nodeID)         # Add the nodeID to the temporary row of the connectivity matrix    
                         nodeID += 1
                         zignore += 1
 

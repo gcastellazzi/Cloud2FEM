@@ -1550,7 +1550,7 @@ if __name__ == "__main__":
                 self.radio1.setEnabled(False)
                 self.radio2.setEnabled(False)
                 if self.radio2.isChecked():
-                    self.plot2d.setTitle('<strong><u><big><mark>D draw</strong>, J join, R remove polyline, A add point,  move point, P remove points, O offset')
+                    self.plot2d.setTitle('<strong><u><big><mark>D draw</strong>, J join, R remove polyline, A add point, M move point, P remove points, O offset')
                     self.tempPolylines = self.polylines.copy()
                     self.polylinesTool = 'draw'
                     self.editInstance = [DrawPolyline(self.tempPolylines, self.plot2d, 10)]

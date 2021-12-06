@@ -130,7 +130,6 @@ def open_project():
             win.lineEdit_wall_thick.setEnabled(True)
             win.lineEdit_xeldim.setEnabled(True)
             win.lineEdit_yeldim.setEnabled(True)
-            # win.btn_edit_slice.setEnabled(True)
             win.check_pcl.setChecked(False)
             win.check_pcl.setEnabled(False)
             win.btn_edit.setEnabled(True)
@@ -719,7 +718,7 @@ class Window(QMainWindow):
             self.editInstance = [ptd.RemovePointsRect(self.tempCentroids, self.plot2d, 10)]
             self.editInstance[0].start()
         elif self.radioPolylines.isChecked():
-            self.plot2d.setTitle('<strong><u><big><mark>D draw</strong>, J join, R remove polyline, A add point,  move point, P remove points, O offset')
+            self.plot2d.setTitle('<strong><u><big><mark>D draw</strong>, J join, R remove polyline, A add point, M move point, P remove points, O offset')
             self.emode = 'polylines'
             self.polylinesTool = 'draw'
             self.tempPolylines = mct.cleanpolys[mct.zcoords[self.combo_slices.currentIndex()]].copy()
