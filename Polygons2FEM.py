@@ -59,16 +59,24 @@ def make_mesh(xeldim, yeldim, xmin, ymin, xmax, ymax, zcoords, polygs):
     # whose generic row represents an element=[xelgridID, yelgridID]
     t0 = time.time()
     elemlist = {}
+    tot_elements = 0  # Total number of elements
+    print('Searching for "pixels" inside polygons...')
     for z in zcoords:
         initstack = 0
         for x in range(len(xelgrid)):
             for y in range(len(yelgrid)):
                 if polygs[z].contains(sg.Point(xelgrid[x], yelgrid[y])):
                     if initstack != 0:
-                        elemlist[z] = np.vstack((elemlist[z], np.array([x, y])))
+                        # elemlist[z] = np.vstack((elemlist[z], np.array([x, y]))) # Python .append is much faster than np.vstack
+                        elemlist[z].append([x, y])
+                        tot_elements += 1
                     else:
-                        elemlist[z] = np.array([[x, y]])
+                        # elemlist[z] = np.array([[x, y]])  # Python .append is much faster than np.vstack
+                        elemlist[z] = [[x, y]]
                         initstack += 1
+                        tot_elements += 1
+        elemlist[z] = np.array(elemlist[z])
+    print('Total number of elements: ', tot_elements)
     t1 = time.time()
     t = t1 - t0
     print('Shapely code, elapsed time:  ', str(t))
@@ -82,10 +90,12 @@ def make_mesh(xeldim, yeldim, xmin, ymin, xmax, ymax, zcoords, polygs):
     elconnect = []          # Initialize connectivity matrix
     ignore = []             # Initialize  the n° nodes to ignore when comparing
     zignore = 0             # Initialize nodes found in the current slice that will be ignored later
+    
+    arr_dim = 0.5           # Percentage used to update the length of the nodelist numpy array
 
     for z in range(len(zcoords)):
         crntz = zcoords[z]              # Current z
-        print('GENERATING ELEMENTS FOR SLICE ', crntz)
+        print('Generating elements for slice ', crntz)
         
         # Set the height (z direction) of the elements of the currently analized slice
         if z != len(zcoords) - 1:
@@ -94,14 +104,9 @@ def make_mesh(xeldim, yeldim, xmin, ymin, xmax, ymax, zcoords, polygs):
             elh = crntz - zcoords[z-1]  # Height of the elements of the last slice
         
         
-        z_elconnect = []  ################ TEST FOR VSTACK NEW ELEMENTS  .... Initialize connectivity for the current slice
-        c_info = 0          # Just a counter used to print info at runtime
+        z_elconnect = []  # Initialize connectivity for the current slice
         
         for elem in elemlist[zcoords[z]]:
-            # Print info message
-            c_info += 1
-            if c_info % 1000 == 0:
-                print('Zcoord: ', zcoords[z], ', element', c_info, ' of ', elemlist[zcoords[z]].shape[0])
             
             tempel = [elID]  # To be filled: temporary row of the connectivity matrix
             
@@ -139,35 +144,45 @@ def make_mesh(xeldim, yeldim, xmin, ymin, xmax, ymax, zcoords, polygs):
                     
                     if z > 2:
                         ignoring = 1  # Comparing only with the nodes in the slice below
-                        nexistsxy = np.logical_and(tempn[1] == nodelist[ignore[z-2]:, 1], tempn[2] == nodelist[ignore[z-2]:, 2])
-                        nexists = np.where(np.logical_and(nexistsxy == True, tempn[3] == nodelist[ignore[z-2]:, 3]))[0]
+                        nexistsxy = np.logical_and(tempn[1] == nodelist[ignore[z-2]:nodeID, 1], tempn[2] == nodelist[ignore[z-2]:nodeID, 2])
+                        nexists = np.where(np.logical_and(nexistsxy == True, tempn[3] == nodelist[ignore[z-2]:nodeID, 3]))[0]
                     elif z <= 2:
                         ignoring = 0
-                        nexistsxy = np.logical_and(tempn[1] == nodelist[:, 1], tempn[2] == nodelist[:, 2])
-                        nexists = np.where(np.logical_and(nexistsxy == True, tempn[3] == nodelist[:, 3]))[0]
+                        nexistsxy = np.logical_and(tempn[1] == nodelist[:nodeID, 1], tempn[2] == nodelist[:nodeID, 2])
+                        nexists = np.where(np.logical_and(nexistsxy == True, tempn[3] == nodelist[:nodeID, 3]))[0]
                         
                     if len(nexists) == 1:
                         if ignoring == 1:
-                            small_nodelist = nodelist[ignore[z - 2]:]
+                            small_nodelist = nodelist[ignore[z - 2]:nodeID]
                             tempel.append(small_nodelist[nexists, 0][0])
                         elif ignoring == 0:
                             tempel.append(nodelist[nexists, 0][0])
                     else:
-                        nodelist = np.vstack((nodelist, tempn))
+                        try:
+                            nodelist[nodeID - 1] = tempn
+                        except IndexError:  # If the length of nodelist is not enough, add to it another piece with nan values
+                            nodelist = np.vstack((nodelist, np.array([[None, None, None, None]] * int(tot_elements * arr_dim)).astype(np.float32, copy=False)))
+                            nodelist[nodeID - 1] = tempn
+                            
                         tempel.append(nodeID)
                         nodeID += 1
                         zignore += 1
 
                 elif elID == 1:
-                    # The 8 lines of code below are used only for the first defined element
+                    # The lines of code below are used only for the first defined element
                     if nodeID == 1:
-                        nodelist = np.array([tempn])  # Store the first line of the node list
+                        nodelist = np.array([[None, None, None, None]] * int(tot_elements * arr_dim)).astype(np.float32, copy=False)
+                        nodelist[nodeID - 1] = tempn
+                        
                         tempel.append(nodeID)         # Add the nodeID to the temporary row of the connectivity matrix
                         nodeID += 1
+                        zignore += 1
                     else:
-                        nodelist = np.vstack((nodelist, tempn)) # Store other lines of the node list (2nd to 8th)
-                        tempel.append(nodeID)                   # Add the nodeID to the temporary row of the connectivity matrix    
+                        nodelist[nodeID - 1] = tempn
+                        
+                        tempel.append(nodeID)         # Add the nodeID to the temporary row of the connectivity matrix    
                         nodeID += 1
+                        zignore += 1
 
             # Add new elements to z_elconnect
             z_elconnect.append(tempel)
@@ -176,7 +191,8 @@ def make_mesh(xeldim, yeldim, xmin, ymin, xmax, ymax, zcoords, polygs):
         # Add z_elconnect to the list that contains all the elements
         elconnect += z_elconnect
         ignore.append(zignore)
-
+    
+    nodelist = nodelist[~np.isnan(nodelist[:, 0])]
     elconnect = np.array(elconnect)
     t1 = time.time()
     t = t1 - t0

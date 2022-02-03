@@ -99,7 +99,10 @@ def open_project():
             mct.xmax = s['xmax']
             mct.ymin = s['ymin']
             mct.ymax = s['ymax']
-            mct.zcoords = s['zcoords']
+            try:
+                mct.zcoords = s['zcoords']
+            except KeyError:
+                mct.zcoords = s['zslices']
             mct.slices = s['slices']
             mct.ctrds = s['ctrds']
             mct.polys = s['polys']
@@ -127,20 +130,20 @@ def open_project():
             win.lineEdit_wall_thick.setEnabled(True)
             win.lineEdit_xeldim.setEnabled(True)
             win.lineEdit_yeldim.setEnabled(True)
-            # win.btn_edit_slice.setEnabled(True)
             win.check_pcl.setChecked(False)
             win.check_pcl.setEnabled(False)
+            win.btn_edit.setEnabled(True)
 
             if mct.ctrds != None:
                 win.check_centroids.setEnabled(True)
                 win.status_centroids.setStyleSheet("background-color: rgb(0, 255, 0);")
                 win.btn_gen_polylines.setEnabled(True)
-                win.btn_edit_centroids.setEnabled(True)
+                win.radioCentroids.setEnabled(True)
             if mct.cleanpolys != None:
                 win.check_polylines.setEnabled(True)
                 win.status_polylines.setStyleSheet("background-color: rgb(0, 255, 0);")
                 win.btn_gen_polygons.setEnabled(True)
-                win.btn_edit_polylines.setEnabled(True)
+                win.radioPolylines.setEnabled(True)
                 win.btn_copy_plines.setEnabled(True)
             if mct.polygs != None:
                 win.status_polygons.setStyleSheet("background-color: rgb(0, 255, 0);")
@@ -715,7 +718,7 @@ class Window(QMainWindow):
             self.editInstance = [ptd.RemovePointsRect(self.tempCentroids, self.plot2d, 10)]
             self.editInstance[0].start()
         elif self.radioPolylines.isChecked():
-            self.plot2d.setTitle('<strong><u><big><mark>D draw</strong>, J join, R remove polyline, A add point,  move point, P remove points, O offset')
+            self.plot2d.setTitle('<strong><u><big><mark>D draw</strong>, J join, R remove polyline, A add point, M move point, P remove points, O offset')
             self.emode = 'polylines'
             self.polylinesTool = 'draw'
             self.tempPolylines = mct.cleanpolys[mct.zcoords[self.combo_slices.currentIndex()]].copy()
