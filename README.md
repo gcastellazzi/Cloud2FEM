@@ -1,5 +1,10 @@
 # Cloud2FEM
-A finite element mesh generator based on point clouds of existing/histociral structures.
+A finite element mesh generator based on point clouds of existing/histociral structures. 
+
+Illustration of the proposed GUI that implements the CLou2FEM method (from the paper "Cloud2FEM: A finite element mesh generator based on point clouds of existing/historical structures" by Giovanni Castellazzi, Nicolò Lo Presti, Antonio Maria D’Altri and, Stefano de Miranda (2022), published in the [SoftwareX Journal](https://www.sciencedirect.com/science/article/pii/S235271102200067X)).
+
+## Idea 
+Nowadays, the common output of surveying activities on existing/historical structures consists of dense point clouds. However, the direct and automatic exploitation of point clouds for structural purposes, i.e. to generate finite element models, is still very limited. In this framework, the `Cloud2FEM` software supplies an automatic finite element mesh generator based on point clouds of existing/historical structures. `Cloud2FEM` is based on open-source Python libraries with graphical interface. 
 
 ## Prerequisites
 [Python 3](https://python.org) installed on your machine.  
