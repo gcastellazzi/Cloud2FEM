@@ -60,3 +60,4 @@ The main functionalities of Cloud2FEM are here listed:
 |:--:|
 | <b>Fig. 4 – Example of generation of a FE mesh based on a point cloud of a benchmark structure by means of the Cloud2FEM software: (a) point cloud used as input visualized at 100% resolution, (b) slicing of the point cloud, (c) slice example with local modification, (d) FE mesh (output).</b>|
 
+
