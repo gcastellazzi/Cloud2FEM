@@ -2,7 +2,7 @@
 A finite element mesh generator based on point clouds of existing/histociral structures.
 
 ## Prerequisites
-[Python 3](https://python.org) installed on your machine.  
+[Python 3.8.5](https://python.org) installed on your machine.  
   
 Use the Python package manager pip to install the following packages:  
 [PyQt5](https://pypi.org/project/PyQt5/), [PyQtGraph](https://pypi.org/project/pyqtgraph/), 
