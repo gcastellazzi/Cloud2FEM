@@ -51,7 +51,7 @@ The main functionalities of Cloud2FEM are here listed:
 - Editing of polylines. A set of tools in the 2D viewer allows for an advanced graphic editing of the polylines. Vertices can be added, removed or moved, polylines can be joined, removed or drawn from scratch if geometric data is missing from the original point cloud.
 - Copy of the polylines of a slice. The polylines of a slice can be copied to other to speed up the editing process.
 
-|![Alt Output](https://github.com/gcastellazzi/Cloud2FEM/blob/main/docs/src/figure04.png "puotput")|
+|![Alt Output](https://github.com/gcastellazzi/Cloud2FEM/blob/main/docs/src/figure03.png "puotput")|
 |:--:|
 | <b>Fig. 4 – Example of generation of a FE mesh based on a point cloud of a benchmark structure by means of the Cloud2FEM software: (a) point cloud used as input visualized at 100% resolution, (b) slicing of the point cloud, (c) slice example with local modification, (d) FE mesh (output).</b>|
 
