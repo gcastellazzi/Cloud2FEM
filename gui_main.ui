@@ -1045,7 +1045,7 @@
                     </size>
                    </property>
                    <property name="text">
-                    <string>Generate Centroids</string>
+                    <string>Generate the Centroids</string>
                    </property>
                   </widget>
                  </item>
