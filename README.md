@@ -32,7 +32,6 @@ The main graphical user interface of the software `Cloud2FEM` is shown in Fig. 1
 The right panel (III) contains, starting from the top, the extreme z coordinates of the loaded point cloud, a section to specify the slicing modality, buttons to perform all the steps needed to generate a FE model. Red and green indicators beside each button denote if a certain step still needs to be performed or not, respectively. Most of the data generated through the steps in the right panel can be visualized in the central plot area (IV), which occupies most of the space of the interface. The 2D Viewer section on the left (V) can be utilized to choose the data to be shown, for any slice. 
 The edit button on the top bar (VI) allows to enter the edit mode for the current slice and for the selected data type. An example of slice processing is shown in Fig. 2.
 
-
 ![Alt Main Window](https://github.com/gcastellazzi/Cloud2FEM/blob/main/docs/src/figure02a.png "main window")      ![Alt Main Window](https://github.com/gcastellazzi/Cloud2FEM/blob/main/docs/src/figure02b.png "main window")      ![Alt Main Window](https://github.com/gcastellazzi/Cloud2FEM/blob/main/docs/src/figure02c.png "main window")
 |:--:|
 | <b>Fig. 2 – Example of slice processing through Cloud2FEM: (a) slice of the raw point cloud, (b) derived centroids and polylines before simplification, (c) final clean geometry ready to be used in the mesh generation step.</b>|
