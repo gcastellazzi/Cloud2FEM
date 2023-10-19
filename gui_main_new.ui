@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>932</width>
-    <height>721</height>
+    <height>736</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -518,8 +518,77 @@
               </layout>
              </widget>
             </item>
-
-            
+            <item>
+             <layout class="QVBoxLayout" name="verticalLayout_11"/>
+            </item>
+            <item>
+             <widget class="Line" name="line_7">
+              <property name="orientation">
+               <enum>Qt::Horizontal</enum>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <layout class="QVBoxLayout" name="verticalLayout_9">
+              <item>
+               <widget class="QLabel" name="label_2">
+                <property name="text">
+                 <string>Insert new Slice</string>
+                </property>
+               </widget>
+              </item>
+             </layout>
+            </item>
+            <item>
+             <layout class="QVBoxLayout" name="verticalLayout_8">
+              <item>
+               <layout class="QHBoxLayout" name="horizontalLayout_15">
+                <item>
+                 <widget class="QLabel" name="label">
+                  <property name="text">
+                   <string>z:</string>
+                  </property>
+                 </widget>
+                </item>
+                <item>
+                 <widget class="QLabel" name="label_4">
+                  <property name="text">
+                   <string>thickness</string>
+                  </property>
+                 </widget>
+                </item>
+               </layout>
+              </item>
+             </layout>
+            </item>
+            <item>
+             <layout class="QHBoxLayout" name="horizontalLayout_14">
+              <item>
+               <widget class="QLineEdit" name="lineEdit_new_z_slice"/>
+              </item>
+              <item>
+               <widget class="QLineEdit" name="lineEdit_new_thick"/>
+              </item>
+             </layout>
+            </item>
+            <item>
+             <layout class="QVBoxLayout" name="verticalLayout_12">
+              <item>
+               <widget class="QPushButton" name="pushButton_add_slice">
+                <property name="text">
+                 <string>Add Slice</string>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <widget class="QPushButton" name="pushButton_sort_zcoords">
+                <property name="text">
+                 <string>Sort slices</string>
+                </property>
+               </widget>
+              </item>
+             </layout>
+            </item>
             <item>
              <spacer name="verticalSpacer">
               <property name="enabled">
@@ -1649,7 +1718,7 @@
      <x>0</x>
      <y>0</y>
      <width>932</width>
-     <height>26</height>
+     <height>24</height>
     </rect>
    </property>
    <widget class="QMenu" name="menuLoad">

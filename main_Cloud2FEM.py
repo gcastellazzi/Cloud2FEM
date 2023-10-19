@@ -261,7 +261,8 @@ def test_plotpolygons():
 class Window(QMainWindow):
     def __init__(self):
         super(Window, self).__init__()
-        loadUi("gui_main.ui", self)
+        #loadUi("gui_main.ui", self)
+        loadUi("gui_main_new.ui", self)
         self.setWindowTitle('Cloud2FEM')
         self.graphlayout.setBackground((255, 255, 255))
         self.plot2d = self.graphlayout.addPlot()
@@ -300,6 +301,10 @@ class Window(QMainWindow):
         self.btn_edit_discard.clicked.connect(self.discard_changes)
         self.btn_edit_finalize.clicked.connect(self.save_changes)
         self.btn_copy_plines.clicked.connect(self.copy_polylines)
+        # Giovanni Start
+        self.pushButton_add_slice.clicked.connect(self.gen_one_slices_clicked)
+        self.pushButton_sort_zcoords.clicked.connect(self.sort_zcoords_clicked)
+        # Giovanni End
         
         # Set some default values
         self.emode = None  # Edit mode status
@@ -312,6 +317,80 @@ class Window(QMainWindow):
         self.pushtest.clicked.connect(test_plotpolygons)
         ######################################################
 
+    def gen_one_slices_clicked(self):
+        self.plot2d.vb.enableAutoRange()
+        new_z = self.lineEdit_new_z_slice.text()
+        c = 1
+        d = self.lineEdit_new_thick.text()
+        a = float(new_z) - float(d)/2
+        b = float(new_z) + float(d)/2
+        try:
+            if len(new_z) == 0 or len(d) == 0:
+                msg_slices = QMessageBox()
+                msg_slices.setWindowTitle('Slicing configuration')
+                msg_slices.setText('\nIncomplete slicing configuration            '
+                                   '\n                                            ')
+                msg_slices.setIcon(QMessageBox.Warning)
+                x = msg_slices.exec_()
+            else:
+                #if self.rbtn_fixnum.isChecked():
+                    #mct.zcoords = cp.make_zcoords(a, b, c, 1)
+                    #one_zcoords = cp.make_zcoords(a, b, c, 1)
+                #    one_zcoords = float(new_z)
+                #    np.append(mct.zcoords,one_zcoords)
+                #elif self.rbtn_fixstep.isChecked():
+                #    mct.zcoords = cp.make_zcoords(a, b, c, 2)
+                #else:
+                #    pass # Custom slicing to be implemented
+                #one_zcoords = float(new_z)
+                #np.append(mct.zcoords,one_zcoords)    
+                #mct.slices, mct.netpcl = cp.make_slices(mct.zcoords, mct.pcl, float(d), mct.npts)
+                mct.slices, mct.netpcl, mct.zcoords = cp.add_slices(float(new_z), mct.pcl, float(d), mct.npts, mct.slices, mct.zcoords)
+                self.combo_slices.clear()
+                for z in mct.zcoords:
+                    self.combo_slices.addItem(str('%.3f' % z))  # Populates the gui slices combobox
+                
+                #self.combo_slices.addItem(str('%.3f' % one_zcoords))  # Populates the gui slices combobox
+
+                print('Slices updated to: ', len(mct.slices.keys()), ' slices')
+                # print(len(mct.slices.{1}), ' slices generated')
+                self.lineEdit_wall_thick.setEnabled(True)
+                self.btn_gen_centr.setEnabled(True)
+                self.btn_edit.setEnabled(True)
+                self.check_pcl_slices.setEnabled(True)
+                self.lineEdit_xeldim.setEnabled(True)
+                self.lineEdit_yeldim.setEnabled(True)
+                self.status_slices.setStyleSheet("background-color: rgb(0, 255, 0);")
+                self.status_centroids.setStyleSheet("background-color: rgb(255, 0, 0);")
+                self.status_polylines.setStyleSheet("background-color: rgb(255, 0, 0);")
+                self.status_polygons.setStyleSheet("background-color: rgb(255, 0, 0);")
+                self.status_mesh.setStyleSheet("background-color: rgb(255, 0, 0);")
+                msg_slicesok = QMessageBox()
+                msg_slicesok.setWindowTitle('Slicing completed')
+                msg_slicesok.setText(str(len(mct.slices.keys())) + ' slices generated    '
+                                                                   '                     ')
+                x = msg_slicesok.exec_()
+        except ValueError:
+            msg_slices2 = QMessageBox()
+            msg_slices2.setWindowTitle('Slicing configuration')
+            msg_slices2.setText('ValueError')
+            msg_slices2.setInformativeText("Only the following input types are allowed:\n\n"
+                                           "From:\n"
+                                           "        integer or float\n"
+                                           "to:\n"
+                                           "        integer or float\n"
+                                           "n° of slices:\n"
+                                           "        integer\n"
+                                           "step height:\n"
+                                           "        integer or float")
+            msg_slices2.setIcon(QMessageBox.Warning)
+            x = msg_slices2.exec_()   
+
+    def sort_zcoords_clicked(self):
+        mct.zcoords = cp.sort_zcoords(mct.zcoords)
+        self.combo_slices.clear()
+        for z in mct.zcoords:
+            self.combo_slices.addItem(str('%.3f' % z))  # Populates the gui slices combobox
 
     def genslices_clicked(self):
         self.plot2d.vb.enableAutoRange()
