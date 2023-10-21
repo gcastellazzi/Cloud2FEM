@@ -1,4 +1,6 @@
 import shelve
+import pickle
+import pysos
 import numpy as np
 from pyntcloud import PyntCloud
 import shapely.geometry as sg
@@ -68,7 +70,7 @@ class MainContainer:
 mct = MainContainer()  # All the main variables are stored here
 
 
-def save_project():
+def save_project_shelve():
     try:
         fd = QFileDialog()
         filepath = fd.getSaveFileName(parent=None, caption="Save Project", directory="",
@@ -85,38 +87,107 @@ def save_project():
     except (ValueError, TypeError, FileNotFoundError):
         print('No file name specified')
 
+def save_project_pysos():
+    try:
+        fd = QFileDialog()
+        filepath = fd.getSaveFileName(parent=None, caption="Save Project", directory="",
+                                      filter="Cloud2FEM Data (*.cloud2fem)")[0]
+        #
+        s = pysos.Dict(filepath)
+        mct_dict = mct.__dict__  # Special method: convert instance of a class to a dict
+        for k in mct_dict.keys():
+            if k in ['filepath', 'pcl', 'netpcl', 'editmode', 'roiIndex', 
+                     'temp_roi_plot', 'temp_polylines', 'temp_scatter', 'temp_points']:
+                continue
+            else:
+                s[k] = mct_dict[k]
+        s.close()
+    except (ValueError, TypeError, FileNotFoundError):
+        print('No file name specified')
+    
+def save_project():
+    try:
+        fd = QFileDialog()
+        filepath = fd.getSaveFileName(parent=None, caption="Save Project", directory="",
+                                      filter="Cloud2FEM Data (*.cloud2fem)")[0]
+        #
+        with open(filepath, 'wb') as handle:
+            pickle.dump(mct, handle, protocol=pickle.HIGHEST_PROTOCOL)
+            mct_dict = mct.__dict__  # Special method: convert instance of a class to a dict
+            #
+        #
+        print('Closing handling file')
+        handle.close()
+    except (ValueError, TypeError, FileNotFoundError):
+        print('No file name specified')
+
 def open_project():
         try:
             fd = QFileDialog()
+            #
             filepath = fd.getOpenFileName(parent=None, caption="Open Project", directory="",
-                                         filter="Cloud2FEM Data (*.cloud2fem.dat)")[0]
-            s = shelve.open(filepath[: -4])
+                                         filter="Cloud2FEM Data (*.cloud2fem);;Old Cloud2FEM Data MacOsx (*.cloud2fem.db);;Old Cloud2FEM Windows Data (*.cloud2fem.dat)")[0]
+            if "cloud2fem.db" in filepath or "cloud2fem.dat" in filepath:
+                s = shelve.open(filepath[: -4])
+                mct.npts = s['npts']
+                mct.zmin = s['zmin']
+                mct.zmax = s['zmax']
+                mct.xmin = s['xmin']
+                mct.xmax = s['xmax']
+                mct.ymin = s['ymin']
+                mct.ymax = s['ymax']
+                try:
+                    mct.zcoords = s['zcoords']
+                except KeyError:
+                    mct.zcoords = s['zslices']
+                mct.slices = s['slices']
+                mct.ctrds = s['ctrds']
+                mct.polys = s['polys']
+                mct.cleanpolys = s['cleanpolys']
+                mct.polygs = s['polygs']
+                mct.xngrid = s['xngrid']
+                mct.xelgrid = s['xelgrid']
+                mct.yngrid = s['yngrid']
+                mct.yelgrid = s['yelgrid']
+                mct.elemlist = s['elemlist']
+                mct.nodelist = s['nodelist']
+                mct.elconnect = s['elconnect']
+                s.close()
+            else:
+                #
+                with open(filepath, "rb") as f:
+                    s = pickle.load(f)
+                #
+                mct.filepath =  s.filepath
+                mct.pcl = s.pcl
+                mct.netpcl = s.netpcl
+                #G
+                mct.npts = s.npts
+                mct.zmin = s.zmin
+                mct.zmax = s.zmax
+                mct.xmin = s.xmin
+                mct.xmax = s.xmax
+                mct.ymin = s.ymin
+                mct.ymax = s.ymax
+                try:
+                    mct.zcoords = s.zcoords
+                except KeyError:
+                    mct.zcoords = s.zslices
+                mct.slices = s.slices
+                mct.ctrds = s.ctrds
+                mct.polys = s.polys
+                mct.cleanpolys = s.cleanpolys
+                mct.polygs = s.polygs
+                mct.xngrid = s.xngrid
+                mct.xelgrid = s.xelgrid
+                mct.yngrid = s.yngrid
+                mct.yelgrid = s.yelgrid
+                mct.elemlist = s.elemlist
+                mct.nodelist = s.nodelist
+                mct.elconnect = s.elconnect
+                f.close()
 
-            mct.npts = s['npts']
-            mct.zmin = s['zmin']
-            mct.zmax = s['zmax']
-            mct.xmin = s['xmin']
-            mct.xmax = s['xmax']
-            mct.ymin = s['ymin']
-            mct.ymax = s['ymax']
-            try:
-                mct.zcoords = s['zcoords']
-            except KeyError:
-                mct.zcoords = s['zslices']
-            mct.slices = s['slices']
-            mct.ctrds = s['ctrds']
-            mct.polys = s['polys']
-            mct.cleanpolys = s['cleanpolys']
-            mct.polygs = s['polygs']
-            mct.xngrid = s['xngrid']
-            mct.xelgrid = s['xelgrid']
-            mct.yngrid = s['yngrid']
-            mct.yelgrid = s['yelgrid']
-            mct.elemlist = s['elemlist']
-            mct.nodelist = s['nodelist']
-            mct.elconnect = s['elconnect']
-            s.close()
-
+            win.combo_slices.clear()
             for z in mct.zcoords:
                 win.combo_slices.addItem(str('%.3f' % z))
             win.main2dplot()
@@ -130,8 +201,8 @@ def open_project():
             win.lineEdit_wall_thick.setEnabled(True)
             win.lineEdit_xeldim.setEnabled(True)
             win.lineEdit_yeldim.setEnabled(True)
-            win.check_pcl.setChecked(False)
-            win.check_pcl.setEnabled(False)
+            win.check_pcl.setChecked(True)
+            win.check_pcl.setEnabled(True)
             win.btn_edit.setEnabled(True)
 
             if mct.ctrds != None:
@@ -333,25 +404,12 @@ class Window(QMainWindow):
                 msg_slices.setIcon(QMessageBox.Warning)
                 x = msg_slices.exec_()
             else:
-                #if self.rbtn_fixnum.isChecked():
-                    #mct.zcoords = cp.make_zcoords(a, b, c, 1)
-                    #one_zcoords = cp.make_zcoords(a, b, c, 1)
-                #    one_zcoords = float(new_z)
-                #    np.append(mct.zcoords,one_zcoords)
-                #elif self.rbtn_fixstep.isChecked():
-                #    mct.zcoords = cp.make_zcoords(a, b, c, 2)
-                #else:
-                #    pass # Custom slicing to be implemented
-                #one_zcoords = float(new_z)
-                #np.append(mct.zcoords,one_zcoords)    
-                #mct.slices, mct.netpcl = cp.make_slices(mct.zcoords, mct.pcl, float(d), mct.npts)
+                
                 mct.slices, mct.netpcl, mct.zcoords = cp.add_slices(float(new_z), mct.pcl, float(d), mct.npts, mct.slices, mct.zcoords)
                 self.combo_slices.clear()
                 for z in mct.zcoords:
                     self.combo_slices.addItem(str('%.3f' % z))  # Populates the gui slices combobox
                 
-                #self.combo_slices.addItem(str('%.3f' % one_zcoords))  # Populates the gui slices combobox
-
                 print('Slices updated to: ', len(mct.slices.keys()), ' slices')
                 # print(len(mct.slices.{1}), ' slices generated')
                 self.lineEdit_wall_thick.setEnabled(True)
