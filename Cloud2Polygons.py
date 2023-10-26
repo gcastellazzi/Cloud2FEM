@@ -98,6 +98,13 @@ def sort_zcoords(zcoords):
     zcoords = np.sort(zcoords)
     return zcoords
 
+def del_zcoords(slices, zcoords, index):
+    """
+    This is deleting the zcoords so the combo_slice is updated
+    """
+    slices.pop(zcoords[index])
+    zcoords = np.delete(zcoords, index)
+    return slices, zcoords
 
 
 def find_centroids(minwthick, zcoords, slices, tolsl=10, tolpt=2, tol=0.01, checkpts=0.1, tolincr=1.35):

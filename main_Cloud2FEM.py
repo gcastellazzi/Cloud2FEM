@@ -4,9 +4,11 @@ import pysos
 import numpy as np
 from pyntcloud import PyntCloud
 import shapely.geometry as sg
+from shapely import wkt
 import sys
 from PyQt5 import QtWidgets
 from PyQt5.QtCore import Qt
+from PyQt5.QtGui import QBrush, QColor
 from PyQt5.QtWidgets import QApplication, QMainWindow, QFileDialog, QMessageBox, QDialog
 from PyQt5.uic import loadUi
 import pyqtgraph as pg
@@ -14,9 +16,11 @@ from pyqtgraph import PlotWidget
 # import pyqtgraph.opengl as gl     # serve per il plot pyqtgraph 3D che non sto usando
 
 from Vispy3DViewer import Visp3dplot
+from vispy.scene.visuals import Text
 import Cloud2Polygons as cp
 import Polygons2FEM as pf
 import plot2D as ptd
+import refresh_database as rd
 
 
 # import ezdxf
@@ -34,7 +38,7 @@ import plot2D as ptd
 
 class MainContainer:
     def __init__(self, filepath=None, pcl=None, npts=None, zmin=None, zmax=None,
-                 xmin=None, xmax=None, ymin=None, ymax=None, zcoords=None,
+                 xmin=None, xmax=None, ymin=None, ymax=None, zcoords=None, minwthick=None, slice_thick=None,
                  slices=None, netpcl=None, ctrds=None, polys=None, cleanpolys=None,
                  polygs=None, xngrid=None, xelgrid=None, yngrid=None, yelgrid=None,
                  elemlist=None, nodelist=None, elconnect=None, temp_points=None,
@@ -49,6 +53,8 @@ class MainContainer:
         self.xmax = xmax
         self.ymin = ymin
         self.ymax = ymax
+        self.minwthick = minwthick
+        self.slice_thick = slice_thick
         self.zcoords = zcoords      # 1D Numpy array of z coordinates utilized to create the slices below
         self.slices = slices        # Dictionary where key(i)=zcoords(i) and value(i)=np_array_xy(i)
         self.netpcl = netpcl        # pcl with empty spaces at slices position (for 3D visualization purposes)
@@ -121,6 +127,76 @@ def save_project():
     except (ValueError, TypeError, FileNotFoundError):
         print('No file name specified')
 
+def reset_global_variables():
+    global mct
+    mct = rd.refresh_database(mct)
+
+def new_project():
+    msg_dxfok = QMessageBox()
+    msg_dxfok.setWindowTitle('New Project')
+    msg_dxfok.setText('WARNING: All unsaved data will be lost')
+
+    # Add the "OK" button
+    ok_button = msg_dxfok.addButton(QMessageBox.Ok)
+    ok_button.setText("OK")
+
+    # Add the "Cancel" button
+    cancel_button = msg_dxfok.addButton(QMessageBox.Cancel)
+    cancel_button.setText("Cancel")
+
+    # Add the "Save..." button
+    save_button = msg_dxfok.addButton("Save...", QMessageBox.AcceptRole)
+
+    # Show the message box
+    result = msg_dxfok.exec_()
+
+    # Check the result to determine the user's choice
+    if result == QMessageBox.Cancel:
+        # User clicked the "Cancel" button
+        print("Canceled")
+    elif result == 0:  # 0 corresponds to the "Save..." button
+        # User clicked the "Save..." button
+        print("Save...")
+        save_project()
+    else:
+        # User clicked the "OK" button
+        print("OK")
+        try:
+            reset_global_variables()
+            win.combo_slices.clear()
+            win.label_zmin_value.setText('')
+            win.label_zmax_value.setText('')
+            win.btn_3dview.setEnabled(False)
+            win.check_pcl_slices.setEnabled(False)
+            win.status_slices.setStyleSheet("background-color: rgb(255, 0, 0);")
+            win.btn_gen_centr.setEnabled(False)
+            win.lineEdit_wall_thick.setEnabled(False)
+            win.lineEdit_xeldim.setEnabled(False)
+            win.lineEdit_yeldim.setEnabled(False)
+            win.check_pcl.setChecked(False)
+            win.check_pcl.setEnabled(False)
+            win.btn_edit.setEnabled(False)
+            win.check_centroids.setEnabled(False)
+            win.status_centroids.setStyleSheet("background-color: rgb(255, 0, 0);")
+            win.btn_gen_polylines.setEnabled(False)
+            win.radioCentroids.setEnabled(False)
+            win.check_polylines.setEnabled(False)
+            win.status_polylines.setStyleSheet("background-color: rgb(255, 0, 0);")
+            win.btn_gen_polygons.setEnabled(False)
+            win.radioPolylines.setEnabled(False)
+            win.btn_copy_plines.setEnabled(False)
+            win.status_polygons.setStyleSheet("background-color: rgb(255, 0, 0);")
+            win.btn_gen_mesh.setEnabled(False)
+            win.exp_dxf.setEnabled(False)
+            win.status_mesh.setStyleSheet("background-color: rgb(255, 0, 0);")
+            win.exp_mesh.setEnabled(False)
+            win.main2dplot()
+            return MainContainer
+        
+        except ValueError:
+            print('No project file selected')
+
+
 def open_project():
         try:
             fd = QFileDialog()
@@ -185,6 +261,11 @@ def open_project():
                 mct.elemlist = s.elemlist
                 mct.nodelist = s.nodelist
                 mct.elconnect = s.elconnect
+                # Check if the attribute 'minwthick' exists before accessing it
+                if hasattr(s, 'minwthick'):
+                    mct.minwthick = s.minwthick
+                else:
+                    mct.minwthick = '0.0'
                 f.close()
 
             win.combo_slices.clear()
@@ -194,6 +275,11 @@ def open_project():
 
             win.label_zmin_value.setText(str(mct.zmin))
             win.label_zmax_value.setText(str(mct.zmax))
+            win.lineEdit_wall_thick.setText(str(mct.minwthick))
+            win.lineEdit_from.setText(str(mct.zcoords[0])) 
+            win.lineEdit_to.setText(str(mct.zcoords[-1])) 
+            win.lineEdit_steporN.setText(str(len(mct.zcoords))) 
+            win.lineEdit_thick.setText(str(mct.slice_thick))
             win.btn_3dview.setEnabled(True)
             win.check_pcl_slices.setEnabled(True)
             win.status_slices.setStyleSheet("background-color: rgb(0, 255, 0);")
@@ -332,8 +418,7 @@ def test_plotpolygons():
 class Window(QMainWindow):
     def __init__(self):
         super(Window, self).__init__()
-        #loadUi("gui_main.ui", self)
-        loadUi("gui_main_new.ui", self)
+        loadUi("gui_main.ui", self)
         self.setWindowTitle('Cloud2FEM')
         self.graphlayout.setBackground((255, 255, 255))
         self.plot2d = self.graphlayout.addPlot()
@@ -344,6 +429,7 @@ class Window(QMainWindow):
         self.Load_PC.triggered.connect(loadpcl)
         self.save_project.triggered.connect(save_project)
         self.open_project.triggered.connect(open_project)
+        self.new_project.triggered.connect(new_project)
         self.exp_dxf.triggered.connect(self.exp_dxf_clicked)
         self.exp_mesh.triggered.connect(self.exp_mesh_clicked)
         self.btn_3dview.clicked.connect(self.open3dview)
@@ -363,6 +449,12 @@ class Window(QMainWindow):
         self.check_2d_centr.toggled.connect(self.main2dplot)
         self.check_2d_polylines.toggled.connect(self.main2dplot)
         self.check_2d_polylines_clean.toggled.connect(self.main2dplot)
+        #
+        self.check_2d_slice_pm.toggled.connect(self.main2dplot)
+        self.check_2d_centr_pm.toggled.connect(self.main2dplot)
+        self.check_2d_polylines_pm.toggled.connect(self.main2dplot)
+        self.check_2d_polylines_clean_pm.toggled.connect(self.main2dplot)
+        #
         self.check_2d_polygons.toggled.connect(self.main2dplot)
         self.lineEdit_xeldim.editingFinished.connect(self.main2dplot)
         self.lineEdit_yeldim.editingFinished.connect(self.main2dplot)
@@ -372,10 +464,12 @@ class Window(QMainWindow):
         self.btn_edit_discard.clicked.connect(self.discard_changes)
         self.btn_edit_finalize.clicked.connect(self.save_changes)
         self.btn_copy_plines.clicked.connect(self.copy_polylines)
-        # Giovanni Start
+        # 
         self.pushButton_add_slice.clicked.connect(self.gen_one_slices_clicked)
         self.pushButton_sort_zcoords.clicked.connect(self.sort_zcoords_clicked)
-        # Giovanni End
+        self.pushButton_del_curr_slice.clicked.connect(self.del_zcoords_clicked)
+        self.btn_unlock_slices.clicked.connect(self.unlock_slices_menu)
+        self.btn_lock_slices.clicked.connect(self.lock_slices_menu)
         
         # Set some default values
         self.emode = None  # Edit mode status
@@ -387,7 +481,31 @@ class Window(QMainWindow):
         # TEST plot poligoni #################################
         self.pushtest.clicked.connect(test_plotpolygons)
         ######################################################
-
+    
+    def unlock_slices_menu(self):
+        # Enable gui widgets
+        win.btn_3dview.setEnabled(True)
+        win.rbtn_fixnum.setEnabled(True)
+        win.rbtn_fixstep.setEnabled(True)
+        win.rbtn_custom_slices.setEnabled(True)
+        win.lineEdit_from.setEnabled(True)
+        win.lineEdit_to.setEnabled(True)
+        win.lineEdit_steporN.setEnabled(True)
+        win.lineEdit_thick.setEnabled(True)
+        win.btn_gen_slices.setEnabled(True)
+    
+    def lock_slices_menu(self):
+        # Disable gui widgets
+        win.btn_3dview.setEnabled(False)
+        win.rbtn_fixnum.setEnabled(False)
+        win.rbtn_fixstep.setEnabled(False)
+        win.rbtn_custom_slices.setEnabled(False)
+        win.lineEdit_from.setEnabled(False)
+        win.lineEdit_to.setEnabled(False)
+        win.lineEdit_steporN.setEnabled(False)
+        win.lineEdit_thick.setEnabled(False)
+        win.btn_gen_slices.setEnabled(False)
+        
     def gen_one_slices_clicked(self):
         self.plot2d.vb.enableAutoRange()
         new_z = self.lineEdit_new_z_slice.text()
@@ -396,6 +514,22 @@ class Window(QMainWindow):
         a = float(new_z) - float(d)/2
         b = float(new_z) + float(d)/2
         try:
+            if float(new_z) > mct.zmax or float(new_z) < mct.zmin:
+                msg_slices = QMessageBox()
+                msg_slices.setWindowTitle('Slicing configuration')
+                msg_slices.setText('\nSlice z is out of range            '
+                                   '\n                                            ')
+                msg_slices.setIcon(QMessageBox.Warning)
+                x = msg_slices.exec_()
+            
+            if float(new_z) in mct.zcoords:
+                msg_slices = QMessageBox()
+                msg_slices.setWindowTitle('Slicing configuration')
+                msg_slices.setText('\nSlice at this z is already present!            '
+                                   '\n                                            ')
+                msg_slices.setIcon(QMessageBox.Warning)
+                x = msg_slices.exec_()
+            
             if len(new_z) == 0 or len(d) == 0:
                 msg_slices = QMessageBox()
                 msg_slices.setWindowTitle('Slicing configuration')
@@ -449,7 +583,19 @@ class Window(QMainWindow):
         self.combo_slices.clear()
         for z in mct.zcoords:
             self.combo_slices.addItem(str('%.3f' % z))  # Populates the gui slices combobox
-
+    
+    def del_zcoords_clicked(self):
+        mct.slices, mct.zcoords = cp.del_zcoords(mct.slices, mct.zcoords, self.combo_slices.currentIndex())
+        new_Index = self.combo_slices.currentIndex()
+        self.combo_slices.clear()
+        for z in mct.zcoords:
+            self.combo_slices.addItem(str('%.3f' % z))  # Populates the gui slices combobox
+        
+        if new_Index > len(mct.zcoords)-1:
+            new_Index = len(mct.zcoords)-1
+        
+        self.combo_slices.setCurrentIndex(new_Index)
+    
     def genslices_clicked(self):
         self.plot2d.vb.enableAutoRange()
         a = self.lineEdit_from.text()
@@ -513,9 +659,9 @@ class Window(QMainWindow):
     def gencentr_clicked(self):
         self.plot2d.vb.enableAutoRange()
         try:
-            minwthick = float(self.lineEdit_wall_thick.text())
+            mct.minwthick = float(self.lineEdit_wall_thick.text())
             
-            mct.ctrds = cp.find_centroids(minwthick, mct.zcoords, mct.slices)
+            mct.ctrds = cp.find_centroids(mct.minwthick, mct.zcoords, mct.slices)
             
             self.check_centroids.setEnabled(True)
             self.radioCentroids.setEnabled(True)
@@ -540,9 +686,9 @@ class Window(QMainWindow):
 
     def genpolylines_clicked(self):
         self.plot2d.vb.enableAutoRange()
-        minwthick = float(self.lineEdit_wall_thick.text())
+        mct.minwthick = float(self.lineEdit_wall_thick.text())
         
-        mct.polys, mct.cleanpolys = cp.make_polylines(minwthick, mct.zcoords, mct.ctrds)
+        mct.polys, mct.cleanpolys = cp.make_polylines(mct.minwthick, mct.zcoords, mct.ctrds)
         
         self.check_polylines.setEnabled(True)
         self.btn_gen_polygons.setEnabled(True)
@@ -560,9 +706,9 @@ class Window(QMainWindow):
 
     def genpolygons_clicked(self):
         self.plot2d.vb.enableAutoRange()
-        minwthick = float(self.lineEdit_wall_thick.text())
+        mct.minwthick = float(self.lineEdit_wall_thick.text())
         
-        mct.polygs, invalidpolygons = cp.make_polygons(minwthick, mct.zcoords, mct.cleanpolys)
+        mct.polygs, invalidpolygons = cp.make_polygons(mct.minwthick, mct.zcoords, mct.cleanpolys)
         
         if len(invalidpolygons) != 0:
             msg_invpoligons = QMessageBox()
@@ -669,6 +815,12 @@ class Window(QMainWindow):
             p3d.print_cloud(mct.netpcl, 0.5)   ############################################ default alpha = 0.75
         elif chkpcl:
             p3d.print_cloud(mct.pcl, 1)
+        
+        # Create a VisPy Text visual for instructions
+        #instruction_text = Text("Drag to move the camera\nRight-click to change the camera", pos=(10, 10), color='red')
+        # Add the text visual to the Visp3dplot scene
+        #p3d.add(instruction_text)
+
         p3d.final3dsetup()
     
     def plot_grid(self):
@@ -689,15 +841,43 @@ class Window(QMainWindow):
 
     def plot_slice(self):
         slm2dplt = mct.slices[mct.zcoords[self.combo_slices.currentIndex()]][:, [0, 1]]
-        scatter2d = pg.ScatterPlotItem(pos=slm2dplt, size=5, brush=pg.mkBrush(0, 0, 0, 255))    #### default size = 5
+        scatter2d = pg.ScatterPlotItem(pos=slm2dplt, size=3, brush=pg.mkBrush(0, 0, 0, 255), pen=pg.mkPen(color=(0, 0, 0)))    #### default size = 5
         self.plot2d.addItem(scatter2d)
         self.staticPlotItems.append(scatter2d)
+        chk2dsli_pm = self.check_2d_slice_pm.isChecked()
+        if chk2dsli_pm :
+            self.plot2d.setTitle("<span style=\"color:red;font-size:12pt\">... Upper Slice hint</span><BR><span style=\"color:black;font-size:12pt\">... Current Slice</span><BR><span style=\"color:green;font-size:12pt\">... Lower Slice hint</span>")
+            slice_n = self.combo_slices.currentIndex()
+            if slice_n < len(mct.zcoords)-1 :
+                slm2dplt = mct.slices[mct.zcoords[slice_n+1]][:, [0, 1]]
+                scatter2d = pg.ScatterPlotItem(pos=slm2dplt, size=2, brush=pg.mkBrush(255, 0, 0, 100), pen=pg.mkPen(color=(255, 0, 0,100)))    #### default size = 5
+                self.plot2d.addItem(scatter2d)
+                self.staticPlotItems.append(scatter2d)
+            if slice_n > 0 :
+                slm2dplt = mct.slices[mct.zcoords[slice_n-1]][:, [0, 1]]
+                scatter2d = pg.ScatterPlotItem(pos=slm2dplt, size=2, brush=pg.mkBrush(0, 255, 0, 100), pen=pg.mkPen(color=(0, 255, 0,100)))    #### default size = 5
+                self.plot2d.addItem(scatter2d)
+                self.staticPlotItems.append(scatter2d)
 
     def plot_centroids(self):
         ctrsm2dplt = mct.ctrds[mct.zcoords[self.combo_slices.currentIndex()]][:, [0, 1]]
-        ctrsscatter2d = pg.ScatterPlotItem(pos=ctrsm2dplt, size=9, brush=pg.mkBrush(255, 0, 0, 255)) ######### default size = 13
+        ctrsscatter2d = pg.ScatterPlotItem(pos=ctrsm2dplt, size=7, brush=pg.mkBrush(255, 0, 0, 255), pen=pg.mkPen(color=(0, 0, 0))) ######### default size = 13
         self.plot2d.addItem(ctrsscatter2d)
         self.staticPlotItems.append(ctrsscatter2d)
+        chk2centr_pm = self.check_2d_centr_pm.isChecked()
+        if chk2centr_pm :
+            self.plot2d.setTitle("<span style=\"color:green;font-size:12pt\">ooo Upper Slice hint</span><BR><span style=\"color:red;font-size:12pt\">ooo Current Slice</span><BR><span style=\"color:blue;font-size:12pt\">ooo Lower Slice hint</span>")
+            slice_n = self.combo_slices.currentIndex()
+            if slice_n < len(mct.zcoords)-1 :
+                ctrsm2dplt = mct.ctrds[mct.zcoords[slice_n+1]][:, [0, 1]]
+                ctrsscatter2d = pg.ScatterPlotItem(pos=ctrsm2dplt, size=4, brush=pg.mkBrush(0, 255, 0, 100), pen=pg.mkPen(color=(0, 255, 0, 100))) ######### default size = 13
+                self.plot2d.addItem(ctrsscatter2d)
+                self.staticPlotItems.append(ctrsscatter2d)
+            if slice_n > 0 :
+                ctrsm2dplt = mct.ctrds[mct.zcoords[slice_n-1]][:, [0, 1]]
+                ctrsscatter2d = pg.ScatterPlotItem(pos=ctrsm2dplt, size=4, brush=pg.mkBrush(0, 0, 255, 100), pen=pg.mkPen(color=(0, 0, 255, 100))) ######### default size = 13
+                self.plot2d.addItem(ctrsscatter2d)
+                self.staticPlotItems.append(ctrsscatter2d)
 
     def plot_polylines(self):
         for poly in mct.polys[mct.zcoords[self.combo_slices.currentIndex()]]:
@@ -705,16 +885,79 @@ class Window(QMainWindow):
             item.setData(poly[:, 0], poly[:, 1])
             self.plot2d.addItem(item)
             self.staticPlotItems.append(item)
+        chk2dplines_pm = self.check_2d_polylines_pm.isChecked()
+        if chk2dplines_pm :
+            self.plot2d.setTitle("<span style=\"color:red;font-size:12pt\">-- Upper Slice hint</span><BR><span style=\"color:blue;font-size:12pt\">-- Current Slice</span><BR><span style=\"color:green;font-size:12pt\">-- Lower Slice hint</span>")
+            slice_n = self.combo_slices.currentIndex()
+            if slice_n < len(mct.zcoords)-1 :
+                for poly in mct.polys[mct.zcoords[slice_n+1]]:
+                    item = pg.PlotCurveItem(pen=pg.mkPen(color=(255, 0, 0, 100), width=3, style=Qt.DashLine))
+                    item.setData(poly[:, 0], poly[:, 1])
+                    self.plot2d.addItem(item)
+                    self.staticPlotItems.append(item)
+            if slice_n > 0 :
+                for poly in mct.polys[mct.zcoords[slice_n-1]]:
+                    item = pg.PlotCurveItem(pen=pg.mkPen(color=(0, 255, 0, 100), width=3, style=Qt.DashLine))
+                    item.setData(poly[:, 0], poly[:, 1])
+                    self.plot2d.addItem(item)
+                    self.staticPlotItems.append(item)
     
     def plot_polys_clean(self):
         for poly in mct.cleanpolys[mct.zcoords[self.combo_slices.currentIndex()]]:
             item = pg.PlotCurveItem(pen=pg.mkPen(color=(0, 0, 0, 255), width=5))
             item.setData(poly[:, 0], poly[:, 1])
+            #item.setBrush(pg.mkBrush(color=(255, 0, 0, 255)))
             self.plot2d.addItem(item)
             self.staticPlotItems.append(item)
             pts = pg.ScatterPlotItem(pos=poly[:, : 2], size=9, brush=pg.mkBrush(255, 0, 0, 255), symbol='s')
             self.plot2d.addItem(pts)
             self.staticPlotItems.append(pts)
+        chk2dplclean_pm = self.check_2d_polylines_clean_pm.isChecked()
+        if chk2dplclean_pm :
+            self.plot2d.setTitle("<span style=\"color:red;font-size:12pt\">-- Upper Slice hint</span><BR><span style=\"color:black;font-size:12pt\">-- Current Slice</span><BR><span style=\"color:green;font-size:12pt\">-- Lower Slice hint</span>")
+            slice_n = self.combo_slices.currentIndex()
+            if slice_n < len(mct.zcoords)-1 :
+                for poly in mct.cleanpolys[mct.zcoords[slice_n+1]]:
+                    item = pg.PlotCurveItem(pen=pg.mkPen(color=(255, 0, 0, 100), width=3, style=Qt.DashLine))
+                    item.setData(poly[:, 0], poly[:, 1])
+                    self.plot2d.addItem(item)
+                    self.staticPlotItems.append(item)
+                    pts = pg.ScatterPlotItem(pos=poly[:, : 2], size=6, brush=pg.mkBrush(255, 0, 0, 100), symbol='o')
+                    self.plot2d.addItem(pts)
+                    self.staticPlotItems.append(pts)
+            if slice_n > 0 :
+                for poly in mct.cleanpolys[mct.zcoords[slice_n-1]]:
+                    item = pg.PlotCurveItem(pen=pg.mkPen(color=(0, 255, 0, 100), width=3, style=Qt.DashLine))
+                    item.setData(poly[:, 0], poly[:, 1])
+                    self.plot2d.addItem(item)
+                    self.staticPlotItems.append(item)
+                    pts = pg.ScatterPlotItem(pos=poly[:, : 2], size=6, brush=pg.mkBrush(0, 255, 0, 100), symbol='t')
+                    self.plot2d.addItem(pts)
+                    self.staticPlotItems.append(pts)
+    
+    def plot_polygs_clean(self):
+        # This part must be improved
+        polygs = mct.polygs[mct.zcoords[self.combo_slices.currentIndex()]]
+
+        try:
+            if len(polygs) > 1:
+                for geom in polygs:
+                    ext_x, ext_y = geom.exterior.xy
+                    polygon_item = pg.PlotDataItem(ext_x, ext_y, fillLevel=0, brush=QBrush(QColor(100, 100, 100, 100)), pen=pg.mkPen(color=(0, 0, 0, 0), width=2))
+                    self.plot2d.addItem(polygon_item)
+                    self.staticPlotItems.append(polygon_item)
+        except TypeError:
+            ext_x, ext_y = polygs.exterior.xy
+            polygon_item = pg.PlotDataItem(ext_x, ext_y, fillLevel=0, brush=QBrush(QColor(100, 100, 100, 100)), pen=pg.mkPen(color=(0, 0, 0, 0), width=2))
+            self.plot2d.addItem(polygon_item)
+            self.staticPlotItems.append(polygon_item)
+            if len(polygs.interiors) > 0:
+                for hole in polygs.interiors:
+                    int_x, int_y = hole.xy
+                    polygon_item = pg.PlotDataItem(int_x, int_y, fillLevel=0, brush=QBrush(QColor(255, 255, 255, 255)), pen=pg.mkPen(color=(0, 0, 0, 0), width=2))
+                    self.plot2d.addItem(polygon_item)
+                    self.staticPlotItems.append(polygon_item)
+
             
 
     def main2dplot(self):
@@ -722,7 +965,11 @@ class Window(QMainWindow):
         chk2centr = self.check_2d_centr.isChecked()
         chk2dplines = self.check_2d_polylines.isChecked()
         chk2dplclean = self.check_2d_polylines_clean.isChecked()
+        #
+        self.plot2d.setTitle('')
+        #
         chk2dgrid = self.check_2d_grid.isChecked()
+        chk2dpolygons = self.check_2d_polygons.isChecked() # Polygons
         # self.plot2d.clear()
         for item in self.staticPlotItems:
             self.plot2d.removeItem(item)
@@ -733,6 +980,8 @@ class Window(QMainWindow):
                     self.plot_grid()
             except:
                 pass
+            if chk2dpolygons and mct.polygs is not None:
+                self.plot_polygs_clean()
             if chk2dplines and mct.polys is not None:
                 self.plot_polylines()
             if chk2dplclean and mct.cleanpolys is not None:
@@ -1011,4 +1260,4 @@ app = QApplication(sys.argv)
 win = Window()
 win.show()
 sys.exit(app.exec_())
-# app.exec_() ## altro metodo che sembra funzionare bene come sys.exit(app.exec_())
+# app.exec_() ## good alternative to sys.exit(app.exec_())
