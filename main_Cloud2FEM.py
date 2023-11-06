@@ -7,12 +7,13 @@ import shapely.geometry as sg
 from shapely import wkt
 import sys
 from PyQt5 import QtWidgets
-from PyQt5.QtCore import Qt
-from PyQt5.QtGui import QBrush, QColor
-from PyQt5.QtWidgets import QApplication, QMainWindow, QFileDialog, QMessageBox, QDialog
+from PyQt5.QtCore import Qt, QProcess, QObject, QEventLoop, pyqtSignal, QPointF
+from PyQt5.QtGui import QBrush, QColor, QTextCursor
+from PyQt5.QtWidgets import QApplication, QMainWindow, QFileDialog, QMessageBox, QDialog, QTextEdit, QVBoxLayout, QPushButton, QProgressBar, QWidget
+
 from PyQt5.uic import loadUi
 import pyqtgraph as pg
-from pyqtgraph import PlotWidget
+from pyqtgraph import PlotWidget, PlotItem
 # import pyqtgraph.opengl as gl     # serve per il plot pyqtgraph 3D che non sto usando
 
 from Vispy3DViewer import Visp3dplot
@@ -21,6 +22,21 @@ import Cloud2Polygons as cp
 import Polygons2FEM as pf
 import plot2D as ptd
 import refresh_database as rd
+import Mesh_functions as mf
+import matplotlib.pyplot as plt
+from matplotlib.patches import Polygon
+import mpl_toolkits.mplot3d as a3
+from mpl_toolkits.mplot3d import Axes3D
+from mpl_toolkits.mplot3d.art3d import Poly3DCollection
+from vispy import app, gloo
+from vispy.visuals.transforms import STTransform
+
+import threading
+import os
+import subprocess
+import time
+from datetime import datetime
+# from mayavi import mlab
 
 
 # import ezdxf
@@ -35,6 +51,23 @@ import refresh_database as rd
 # git update test 2
 #############
 
+# class Logger:
+#     def __init__(self, log_file):
+#         self.log_file = log_file
+
+#     def write(self, text):
+#         with open(self.log_file, 'a') as f:
+#             f.write(text)
+
+#     def switch_to_terminal(self):
+#         sys.stdout = sys.__stdout__  # Revert to the original stdout
+#         # Redirect stdout and stderr to QTextEdit
+#         #sys.stdout = StreamToTextEdit(self.plainText_terminal, sys.stdout)
+#         #sys.stderr = StreamToTextEdit(self.plainText_terminal, sys.stderr)
+
+#     def switch_to_file(self):
+#         sys.stdout = self
+
 
 class MainContainer:
     def __init__(self, filepath=None, pcl=None, npts=None, zmin=None, zmax=None,
@@ -43,7 +76,7 @@ class MainContainer:
                  polygs=None, xngrid=None, xelgrid=None, yngrid=None, yelgrid=None,
                  elemlist=None, nodelist=None, elconnect=None, temp_points=None,
                  temp_scatter=None, temp_polylines=None, temp_roi_plot=None,
-                 editmode=None, roiIndex=None):
+                 editmode=None, roiIndex=None, sorted_faces=None, sorted_faces_x=None, sorted_faces_y=None):
         self.filepath = filepath
         self.pcl = pcl              # Whole PCl as a 3-columns xyz numpy array
         self.npts = npts            # the above 'pcl' number of points
@@ -69,6 +102,11 @@ class MainContainer:
         self.elemlist = elemlist    # Dict key(i) = zcoords(i), value(i) = [[x1, y1], [x2, y2], ..., [xn, yn]]
         self.nodelist = nodelist    # Np array, row[i] = [nodeID, x, y, z]
         self.elconnect = elconnect  # Np array, row[i] = [edelmID, nID1, nID2, nID3, nID4, nID5, nID6, nID7, nID8]
+        self.sorted_faces = sorted_faces # databse of voxel faces (internal faces)
+        self.sorted_faces_x = sorted_faces_x # databse of x voxel faces (internal faces)
+        self.sorted_faces_y = sorted_faces_y # databse of y voxel faces (internal faces)
+        #
+
 
 
 
@@ -112,6 +150,23 @@ def save_project_pysos():
         print('No file name specified')
     
 def save_project():
+    try:
+        #fd = QFileDialog()
+        filepath = mct.filepath 
+        #fd.getSaveFileName(parent=None, caption="Save Project", directory="",
+        #                              filter="Cloud2FEM Data (*.cloud2fem)")[0]
+        #
+        with open(filepath, 'wb') as handle:
+            pickle.dump(mct, handle, protocol=pickle.HIGHEST_PROTOCOL)
+            mct_dict = mct.__dict__  # Special method: convert instance of a class to a dict
+            #
+        #
+        print('Closing handling file')
+        handle.close()
+    except (ValueError, TypeError, FileNotFoundError):
+        print('No file name specified')
+
+def save_project_as():
     try:
         fd = QFileDialog()
         filepath = fd.getSaveFileName(parent=None, caption="Save Project", directory="",
@@ -190,12 +245,20 @@ def new_project():
             win.exp_dxf.setEnabled(False)
             win.status_mesh.setStyleSheet("background-color: rgb(255, 0, 0);")
             win.exp_mesh.setEnabled(False)
+            win.check_2d_pixel.setEnabled(False)
+            win.check_2d_pixel_pm.setEnabled(False)
             win.main2dplot()
             return MainContainer
         
         except ValueError:
             print('No project file selected')
 
+def open_file_in_app(self):
+    print('This feature to be implemented. Open file directly from explorer')
+    # try:
+    #     os.startfile(self.filename)
+    # except:
+    #     subprocess.Popen(['open', '-t', self.filename])
 
 def open_project():
         try:
@@ -261,11 +324,27 @@ def open_project():
                 mct.elemlist = s.elemlist
                 mct.nodelist = s.nodelist
                 mct.elconnect = s.elconnect
+                #mct.sorted_faces = s.sorted_faces
                 # Check if the attribute 'minwthick' exists before accessing it
                 if hasattr(s, 'minwthick'):
                     mct.minwthick = s.minwthick
                 else:
                     mct.minwthick = '0.0'
+                # Check if the attribute 'sorted_faces' exists before accessing it
+                if hasattr(s, 'sorted_faces'):
+                    mct.sorted_faces = s.sorted_faces
+                else:
+                    mct.sorted_faces = None
+                if hasattr(s, 'sorted_faces_x'):
+                    mct.sorted_faces_x = s.sorted_faces_x
+                else:
+                    mct.sorted_faces_x = None
+                if hasattr(s, 'sorted_faces_y'):
+                    mct.sorted_faces_y = s.sorted_faces_y
+                else:
+                    mct.sorted_faces_y = None
+                mct.clicked_x = None
+                mct.clicked = None
                 f.close()
 
             win.combo_slices.clear()
@@ -411,8 +490,37 @@ def test_plotpolygons():
 
 
 
+class ClickHandler(QObject):
+    click_signal = pyqtSignal(float, float)
 
+    def __init__(self, plot2d):
+        super(ClickHandler, self).__init__()
+        self.plot2d = plot2d
+        self.connected = False  # Track the connection status
 
+    def start(self):
+        if not self.connected:
+            self.plot2d.scene().sigMouseClicked.connect(self.on_plot_clicked)
+            self.connected = True
+
+    def stop(self):
+        if self.connected:
+            self.plot2d.scene().sigMouseClicked.disconnect(self.on_plot_clicked)
+            self.connected = False
+
+    def on_plot_clicked(self, event):
+        if event.button() == Qt.LeftButton:
+            pos = event.scenePos()
+            x = pos.x()
+            y = pos.y()
+            self.click_signal.emit(x, y)
+            #self.stop()  # Disconnect the signal after the first left-click event
+        elif event.button() == Qt.RightButton:
+            # Disconnect the mouse click event to stop the function
+            self.plot2d.scene().sigMouseClicked.disconnect(self.on_plot_clicked)
+            self.is_active = False  # Function is no longer active
+            self.signal_connected = False
+            
 
 
 class Window(QMainWindow):
@@ -425,9 +533,22 @@ class Window(QMainWindow):
         self.plot2d.setAspectLocked(lock=True)
         self.plot2d.setTitle('')
         # self.plot2d.enableAutoRange(enable=False)  # Da sistemare, mantiene gli assi bloccati quando aggiorno il plot?
-
+        #
+        Time_now = datetime.now().strftime("%Y_%m_%d-%I_%M_%S_%p")
+        self.filename = ('debug_log_' + Time_now + '.txt')
+        # Redirect stdout and stderr to QTextEdit
+        sys.stdout = StreamToTextEdit(self.plainText_terminal, sys.stdout, self.filename)
+        sys.stderr = StreamToTextEdit(self.plainText_terminal, sys.stderr, self.filename)
+        #
         self.Load_PC.triggered.connect(loadpcl)
         self.save_project.triggered.connect(save_project)
+        #
+        
+        self.actionOpen_Log_File.triggered.connect(open_file_in_app)
+        #self.actionVerbose_Terminal.triggered.connect(logger.switch_to_terminal)
+        #
+        #self.actionVerbose_Log_File.triggered.connect(logger.switch_to_file)
+        #
         self.open_project.triggered.connect(open_project)
         self.new_project.triggered.connect(new_project)
         self.exp_dxf.triggered.connect(self.exp_dxf_clicked)
@@ -454,6 +575,8 @@ class Window(QMainWindow):
         self.check_2d_centr_pm.toggled.connect(self.main2dplot)
         self.check_2d_polylines_pm.toggled.connect(self.main2dplot)
         self.check_2d_polylines_clean_pm.toggled.connect(self.main2dplot)
+        self.check_2d_pixel.toggled.connect(self.main2dplot)
+        self.check_2d_pixel_pm.toggled.connect(self.main2dplot)
         #
         self.check_2d_polygons.toggled.connect(self.main2dplot)
         self.lineEdit_xeldim.editingFinished.connect(self.main2dplot)
@@ -470,18 +593,88 @@ class Window(QMainWindow):
         self.pushButton_del_curr_slice.clicked.connect(self.del_zcoords_clicked)
         self.btn_unlock_slices.clicked.connect(self.unlock_slices_menu)
         self.btn_lock_slices.clicked.connect(self.lock_slices_menu)
-        
+        self.btn_slice_down.clicked.connect(self.slice_down)
+        self.btn_slice_up.clicked.connect(self.slice_up)
+        #
+        self.btn_plot_mesh.clicked.connect(self.plot_mesh)
+        #
         # Set some default values
         self.emode = None  # Edit mode status
         self.staticPlotItems = []  # List of non editable plotted items
-
-
-
+        #
+        # Initialize class-level variables to store coordinates and a flag to check if the function is active
+        self.clicked_x = None
+        self.clicked_y = None
+        self.abs_min_x = None
+        self.abs_min_y = None
+        self.abs_max_x = None
+        self.abs_max_y = None
+        self.clicked_point = None
+        self.btn_plot_xy_sections.clicked.connect(self.get_pixel_xy)
+        self.click_handler = ClickHandler(self.plot2d)
+        self.signal_connected = False
+        #
+        # manual version
+        self.btn_plot_xy_section_manual.clicked.connect(self.plot_pixel_xy_m)
+        self.figure_on = False
 
         # TEST plot poligoni #################################
         self.pushtest.clicked.connect(test_plotpolygons)
         ######################################################
     
+    def plot_mesh(self):
+        xyz = mct.nodelist
+        LCO = mct.elconnect
+        check_consistency = False
+        do_parallel_computing = False # Problems with the GUI
+        csize = LCO.shape[1]
+        if check_consistency:
+            if do_parallel_computing:
+                start_time = time.time()
+                problematic_elements = mf.connectivity_check_consitency_parallel_ncores(LCO[:,1:csize], 4)
+                end_time = time.time()
+                elapsed_time = end_time - start_time
+                print(f"Elapsed time 4 cores: {elapsed_time:.2f} seconds")
+            else:
+                problematic_elements = mf.connectivity_check_consitency(LCO[:,1:csize])
+            if len(problematic_elements)>0:
+                print('Some problems were found for the following elements:', problematic_elements)
+
+        
+        nfig = 33
+        options = False
+        color = 'k'
+        # Create a figure
+        # fig = plt.figure(nfig)
+        # Create a 3D axes with auto_add_to_figure=False
+        # ax = Axes3D(fig, auto_add_to_figure=False)
+        # Add the 3D axes to the figure
+        # fig.add_axes(ax)
+        #ax = mf.plot_simple_mesh(xyz[:,1:4], LCO[:,1:csize], nfig, ax, color, options)
+        # plt.show()
+        #boundary_faces, element_faces, normals, belongs_to_element, repetitions = mf.get_boundary_faces(LCO[:,1:csize],xyz[:,1:4])
+        boundary_faces = mf.find_external_faces(LCO[:,1:csize].astype(int))
+        # print(boundary_faces)
+        #element_faces
+        #ax = mf.plot_boundary_mesh(xyz[:,1:4], element_faces, boundary_faces, nfig, ax)
+        # Create a figure and axis for 3D plotting
+        fig = plt.figure()
+        ax = fig.add_subplot(111, projection='3d')
+
+        # Plot the faces
+       # Plot the boundary_faces
+        for face in boundary_faces:
+            poly3d = [xyz[i-1,1:4] for i in face]
+            ax.add_collection3d(Poly3DCollection([poly3d], facecolors='gray', linewidths=1, edgecolors='k', alpha=0.5))
+
+
+        # Set axis labels
+        ax.set_xlabel('X')
+        ax.set_ylabel('Y')
+        ax.set_zlabel('Z')
+        plt.show()
+
+
     def unlock_slices_menu(self):
         # Enable gui widgets
         win.btn_3dview.setEnabled(True)
@@ -596,6 +789,26 @@ class Window(QMainWindow):
         
         self.combo_slices.setCurrentIndex(new_Index)
     
+    def slice_down(self):
+        
+        new_Index = self.combo_slices.currentIndex()
+        new_Index = new_Index -1
+                
+        if new_Index < 0 :
+            new_Index = len(mct.zcoords)+1
+        
+        self.combo_slices.setCurrentIndex(new_Index)
+    
+    def slice_up(self):
+    
+        new_Index = self.combo_slices.currentIndex()
+        new_Index = new_Index + 1 
+
+        if new_Index > len(mct.zcoords)-1:
+            new_Index = len(mct.zcoords)-1
+        
+        self.combo_slices.setCurrentIndex(new_Index)
+    
     def genslices_clicked(self):
         self.plot2d.vb.enableAutoRange()
         a = self.lineEdit_from.text()
@@ -635,6 +848,21 @@ class Window(QMainWindow):
                 self.status_polylines.setStyleSheet("background-color: rgb(255, 0, 0);")
                 self.status_polygons.setStyleSheet("background-color: rgb(255, 0, 0);")
                 self.status_mesh.setStyleSheet("background-color: rgb(255, 0, 0);")
+                #
+                self.check_2d_centr.setEnabled(False)
+                self.check_2d_centr_pm.setEnabled(False)
+                #
+                self.check_2d_polylines.setEnabled(False)
+                self.check_2d_polylines_pm.setEnabled(False)
+                #
+                self.check_2d_polylines_clean.setEnabled(False)
+                self.check_2d_polylines_clean_pm.setEnabled(False)
+                #
+                self.check_2d_pixel.setEnabled(False)
+                self.check_2d_pixel_pm.setEnabled(False)
+                #
+                self.check_2d_polygons.setEnabled(False)
+                #
                 msg_slicesok = QMessageBox()
                 msg_slicesok.setWindowTitle('Slicing completed')
                 msg_slicesok.setText(str(len(mct.slices.keys())) + ' slices generated    '
@@ -670,6 +898,9 @@ class Window(QMainWindow):
             self.status_polylines.setStyleSheet("background-color: rgb(255, 0, 0);")
             self.status_polygons.setStyleSheet("background-color: rgb(255, 0, 0);")
             self.status_mesh.setStyleSheet("background-color: rgb(255, 0, 0);")
+            #
+            self.check_2d_centr.setEnabled(True)
+            self.check_2d_centr_pm.setEnabled(True)
             self.main2dplot()
             msg_centrok = QMessageBox()
             msg_centrok.setWindowTitle('Generate Centroids')
@@ -687,8 +918,12 @@ class Window(QMainWindow):
     def genpolylines_clicked(self):
         self.plot2d.vb.enableAutoRange()
         mct.minwthick = float(self.lineEdit_wall_thick.text())
-        
-        mct.polys, mct.cleanpolys = cp.make_polylines(mct.minwthick, mct.zcoords, mct.ctrds)
+        # Convert Shapely coordinates to a numpy array
+        ctrds_np = np.array([list(geom.coords) for geom in mct.ctrds])
+
+        mct.polys, mct.cleanpolys = cp.make_polylines(mct.minwthick, mct.zcoords, ctrds_np)
+
+        #mct.polys, mct.cleanpolys = cp.make_polylines(mct.minwthick, mct.zcoords, mct.ctrds)
         
         self.check_polylines.setEnabled(True)
         self.btn_gen_polygons.setEnabled(True)
@@ -697,6 +932,12 @@ class Window(QMainWindow):
         self.status_polylines.setStyleSheet("background-color: rgb(0, 255, 0);")
         self.status_polygons.setStyleSheet("background-color: rgb(255, 0, 0);")
         self.status_mesh.setStyleSheet("background-color: rgb(255, 0, 0);")
+        #
+        self.check_2d_polylines.setEnabled(True)
+        self.check_2d_polylines_pm.setEnabled(True)
+        #
+        self.check_2d_polylines_clean.setEnabled(True)
+        self.check_2d_polylines_clean_pm.setEnabled(True)
         self.main2dplot()
         msg_polysok = QMessageBox()
         msg_polysok.setWindowTitle('Generate Polylines')
@@ -724,6 +965,8 @@ class Window(QMainWindow):
         self.exp_dxf.setEnabled(True)
         self.status_polygons.setStyleSheet("background-color: rgb(0, 255, 0);")
         self.status_mesh.setStyleSheet("background-color: rgb(255, 0, 0);")
+        #
+        self.check_2d_polygons.setEnabled(True)
         self.main2dplot()
         msg_polygsok = QMessageBox()
         msg_polygsok.setWindowTitle('Generate Polygons')
@@ -749,8 +992,14 @@ class Window(QMainWindow):
 
         mct.elemlist, mct.nodelist, mct.elconnect = pf.make_mesh(
             xeldim, yeldim, mct.xmin, mct.ymin, mct.xmax, mct.ymax, mct.zcoords, mct.polygs)
-        
+        #
+        mct.sorted_faces = None
+        mct.sorted_faces_x = None
+        mct.sorted_faces_y = None
+        #
         self.check_mesh.setEnabled(True)
+        self.check_2d_pixel.setEnabled(True)
+        self.check_2d_pixel_pm.setEnabled(True)
         self.main2dplot()
         self.exp_mesh.setEnabled(True)
         self.status_mesh.setStyleSheet("background-color: rgb(0, 255, 0);")
@@ -810,7 +1059,7 @@ class Window(QMainWindow):
         if chkply:
             p3d.print_polylines(mct)
         if chkmesh:
-            p3d.print_mesh(mct)
+            p3d.print_mesh2(mct)
         if chkpcl and (chksli or chkctr or chkply or chkmesh):
             p3d.print_cloud(mct.netpcl, 0.5)   ############################################ default alpha = 0.75
         elif chkpcl:
@@ -878,7 +1127,279 @@ class Window(QMainWindow):
                 ctrsscatter2d = pg.ScatterPlotItem(pos=ctrsm2dplt, size=4, brush=pg.mkBrush(0, 0, 255, 100), pen=pg.mkPen(color=(0, 0, 255, 100))) ######### default size = 13
                 self.plot2d.addItem(ctrsscatter2d)
                 self.staticPlotItems.append(ctrsscatter2d)
+    
+    #
+    def on_clicked(self, x, y):
+        print(f"Clicked at ({x}, {y})")
+        #self.click_handler.stop()  # Disconnect the signal here
+        view_pos = self.plot2d.getViewBox().mapSceneToView(QPointF(x, y))
+        self.clicked_x, self.clicked_y = view_pos.x(), view_pos.y()
+        self.plot_pixel_xy_m()
+        print(f"Clicked at (scene coordinates: {x}, {y}), (graph coordinates: {self.clicked_x}, {self.clicked_y})")
+        # Disconnect the signal only if it was connected in this function
+        # if self.signal_connected:
+        #     self.click_handler.stop()
+        #     self.signal_connected = False
+    #
+    def get_pixel_xy(self):
+        #
+        self.plot2d.setTitle("<span style=\"color:black;font-size:12pt\">Mouse Left Click: select section location (x,y)</span><BR><span style=\"color:red;font-size:12pt\">Mouse Right Click: stop selection</span>")
+        if self.signal_connected:
+            try: self.click_handler.stop()  # Disconnect the signal if it was previously connected
+            except Exception: 
+                pass
+                self.connected = False
+            
 
+        self.click_handler.start()
+        loop = QEventLoop()
+        self.signal_connected = True
+        self.click_handler.click_signal.connect(self.on_clicked)
+        loop.exec_()
+        #
+    def plot_pixel_xy(self, xcoord, ycoord):
+        if self.clicked_point is not None:
+            print('self.clicked_point is defined')
+    
+    def plot_pixel_xy_m(self):
+        if self.signal_connected:
+            xcoord = self.clicked_x
+            ycoord = self.clicked_y
+        else:
+            xcoord = float(self.lineEdit_xpixel.text())
+            ycoord = float(self.lineEdit_ypixel.text())
+        
+        if self.abs_min_x == None or self.abs_min_y:
+            self.abs_min_x = min(mct.nodelist[:,1])
+            self.abs_max_x = max(mct.nodelist[:,1])
+            self.abs_min_y = min(mct.nodelist[:,2])
+            self.abs_max_y = max(mct.nodelist[:,2])
+
+        # Create the infinite lines
+        x_line = pg.InfiniteLine(pos=ycoord, angle=0, pen=pg.mkPen('r', width=4))
+        y_line = pg.InfiniteLine(pos=xcoord, angle=90, pen=pg.mkPen('g', width=4))
+        # Add the lines to the plot
+        self.plot2d.addItem(x_line)
+        self.plot2d.addItem(y_line)
+        self.staticPlotItems.append(x_line)
+        self.staticPlotItems.append(y_line)
+        # Calculate the intersection point
+        intersection_x = xcoord
+        intersection_y = ycoord
+
+        # Create the arrows with positions at the intersection point
+        arrow_x = pg.ArrowItem(angle=-90, tipAngle=30, baseAngle=20, headLen=20, tailLen=20, tailWidth=0, pos=(intersection_x, intersection_y), pen=pg.mkPen('r', width=2))
+        arrow_y = pg.ArrowItem(angle=0, tipAngle=30, baseAngle=20, headLen=20, tailLen=20, tailWidth=0, pos=(intersection_x, intersection_y), pen=pg.mkPen('g', width=2))
+
+        self.plot2d.addItem(arrow_x)
+        self.plot2d.addItem(arrow_y)
+        self.staticPlotItems.append(arrow_x)
+        self.staticPlotItems.append(arrow_y)
+        #chk2dpixel_pm = self.check_2d_pixel_pm.isChecked()
+        LCO_matrix = mct.elconnect[:,1:9]
+        LCO = LCO_matrix.astype(int)
+        xyz = mct.nodelist
+        xy_pairs = (np.unique(xyz[:,1]),np.unique(xyz[:,2]))
+        if mct.sorted_faces_x == None :
+            mct.sorted_faces_x, mct.sorted_faces_y  = mf.find_pixel_xy(LCO, xyz, xy_pairs)
+            sorted_faces_x = mct.sorted_faces_x
+            sorted_faces_y = mct.sorted_faces_y
+        else:
+            sorted_faces_x = mct.sorted_faces_x
+            sorted_faces_y = mct.sorted_faces_y
+        
+        # You are expecting to find element within the dimension of the grid
+        toll_xeldim = float(self.lineEdit_xeldim.text())/2
+        toll_yeldim = float(self.lineEdit_yeldim.text())/2
+
+        # Convert sorted_faces to a Numpy array with object dtype
+        sorted_faces_x_array = np.array(sorted_faces_x, dtype=object)
+        sorted_faces_y_array = np.array(sorted_faces_y, dtype=object)
+
+        # Find matching rows efficiently
+        matching_rows_x = np.where(np.abs(sorted_faces_x_array[:, 0] - xcoord) < toll_xeldim)[0]
+        matching_rows_y = np.where(np.abs(sorted_faces_y_array[:, 0] - ycoord) < toll_yeldim)[0]
+        
+        start_time = time.time()
+        # Create a figure with two subplots
+        plt.close('all')
+        fig, axes = plt.subplots(1, 2, figsize=(10, 5))
+        self.figure_on = True
+        for index in matching_rows_x:
+            face = sorted_faces_x_array[index]
+
+            coords = [(xyz[face[2][0], 2], xyz[face[2][0], 3]),
+                    (xyz[face[2][1], 2], xyz[face[2][1], 3]),
+                    (xyz[face[2][2], 2], xyz[face[2][2], 3]),
+                    (xyz[face[2][3], 2], xyz[face[2][3], 3])]
+            #
+            # Plot rectangles with green filling on the left subplot
+            axes[0].set_aspect('equal')
+            polygon = Polygon(coords, closed=True, facecolor='green', edgecolor='black',  alpha=0.3)
+            axes[0].add_patch(polygon)
+        margin_tolerance = 0.05*self.abs_max_y
+        if abs(self.abs_min_y) < margin_tolerance:
+            self.abs_min_y = - margin_tolerance
+        
+        if self.abs_min_y < 0:
+            coeff = 1.05
+        else:
+            coeff = 0.95
+        if self.abs_max_y < 0:
+            coeffm = .95
+        else:
+            coeffm = 1.05
+        axes[0].hlines(y=mct.zcoords[self.combo_slices.currentIndex()], xmin=coeff*self.abs_min_y, xmax=coeffm*self.abs_max_y, colors='k', linewidth=3)  # Horizontal line
+        axes[0].vlines(x=ycoord, ymin=0.5*min(mct.zcoords[:]), ymax=1.5*max(mct.zcoords[:]), colors='r', linewidth=3)  # Vertical line
+        axes[0].set_title('X section ')        
+        axes[0].set_xlim(coeff*self.abs_min_y, coeffm*self.abs_max_y)
+        axes[0].set_ylim(0.95*min(mct.zcoords[:]), 1.3*max(mct.zcoords[:]))
+        axes[0].set_aspect('equal', 'box')
+        #
+        for index in matching_rows_y:
+            face = sorted_faces_y_array[index]
+
+            coords = [(xyz[face[2][0], 1], xyz[face[2][0], 3]),
+                    (xyz[face[2][1], 1], xyz[face[2][1], 3]),
+                    (xyz[face[2][2], 1], xyz[face[2][2], 3]),
+                    (xyz[face[2][3], 1], xyz[face[2][3], 3])]
+
+            # Plot rectangles with red filling on the right subplot
+            axes[1].set_aspect('equal')
+            polygon = Polygon(coords, closed=True, facecolor='red', edgecolor='black',  alpha=0.3)
+            axes[1].add_patch(polygon)
+
+        margin_tolerance = 0.05*self.abs_max_x
+        if abs(self.abs_min_x) < margin_tolerance:
+            self.abs_min_x = - margin_tolerance
+        
+        if self.abs_min_x < 0:
+            coeff = 1.05
+        else:
+            coeff = 0.95
+        if self.abs_max_x < 0:
+            coeffm = 0.95
+        else:
+            coeffm = 1.05
+        
+        axes[1].hlines(y=mct.zcoords[self.combo_slices.currentIndex()], xmin=coeff*self.abs_min_x, xmax= coeffm*self.abs_max_x, colors='k', linewidth=3)  # Horizontal line
+        axes[1].vlines(x=xcoord, ymin=0.5*min(mct.zcoords[:]), ymax=1.5*max(mct.zcoords[:]), colors='g', linewidth=3)  # Vertical line
+        axes[1].set_title('Y Section')
+        axes[1].set_xlim(coeff*self.abs_min_x, coeffm*self.abs_max_x)
+        axes[1].set_ylim(0.95*min(mct.zcoords[:]), 1.3*max(mct.zcoords[:]))
+        axes[1].set_aspect('equal', 'box')
+
+        plt.tight_layout()  # Adjust spacing between subplots
+        plt.show()
+
+        end_time = time.time()
+        elapsed_time = end_time - start_time
+        print(f"Elapsed time plot_pixel_xy function: {elapsed_time:.2f} seconds (excluding pixel_find)")
+
+        # Store the polygon items if needed
+        # self.staticPlotItems.extend(polygon_items)
+
+
+    def plot_pixel(self):
+        chk2dpixel_pm = self.check_2d_pixel_pm.isChecked()
+        LCO_matrix = mct.elconnect[:,1:9]
+        LCO = LCO_matrix.astype(int)
+        xyz = mct.nodelist
+        if mct.sorted_faces == None :
+            mct.sorted_faces = mf.find_pixel(LCO, xyz, mct.zcoords)
+            sorted_faces = mct.sorted_faces
+        else:
+            sorted_faces = mct.sorted_faces
+        
+        # Retrieve relevant data
+        zcord = mct.zcoords[self.combo_slices.currentIndex()]
+        tole = 1e-4
+
+        # Convert sorted_faces to a Numpy array with object dtype
+        sorted_faces_z_array = np.array(sorted_faces, dtype=object)
+
+        # Find matching rows efficiently
+        matching_rows = np.where(np.abs(sorted_faces_z_array[:, 0] - zcord) < tole)[0]
+        
+        start_time = time.time()
+        polygon_items = []
+
+        for index in matching_rows:
+            face = sorted_faces_z_array[index]
+
+            coords = [(xyz[face[2][0], 1], xyz[face[2][0], 2]),
+                    (xyz[face[2][1], 1], xyz[face[2][1], 2]),
+                    (xyz[face[2][2], 1], xyz[face[2][2], 2]),
+                    (xyz[face[2][3], 1], xyz[face[2][3], 2])]
+
+            # Create a list of coordinates for the exterior
+            exterior_coords = list(sg.Polygon(coords).exterior.coords)
+            polygon_item = pg.PlotDataItem(*zip(*exterior_coords), fillLevel=0,
+                                        brush=QBrush(QColor(65, 105, 225, 100)),
+                                        pen=pg.mkPen(color=(0, 0, 0, 0), width=2))
+            self.plot2d.addItem(polygon_item)
+            polygon_items.append(polygon_item)
+
+        end_time = time.time()
+        elapsed_time = end_time - start_time
+        print(f"Elapsed time plot_pixel function: {elapsed_time:.2f} seconds (excluding pixel_find)")
+
+        # Store the polygon items if needed
+        self.staticPlotItems.extend(polygon_items)
+    
+    def plot_pixel_old(self):
+        chk2dpixel_pm = self.check_2d_pixel_pm.isChecked()
+        LCO_matrix = mct.elconnect[:,1:9]
+        LCO = LCO_matrix.astype(int)
+        xyz = mct.nodelist
+        if mct.sorted_faces == None :
+            mct.sorted_faces = mf.find_pixel(LCO, xyz, mct.zcoords)
+            sorted_faces = mct.sorted_faces
+        else:
+            sorted_faces = mct.sorted_faces
+        
+        # This part must be improved
+        start_time = time.time()  
+        zcord = mct.zcoords[self.combo_slices.currentIndex()]
+        # Convert tuples in sorted_faces to lists and ensure each row has the same length
+        max_row_length = max(len(row) for row in sorted_faces)
+        sorted_faces_fixed = np.array([list(row) + [0] * (max_row_length - len(row)) for row in sorted_faces], dtype=object)
+
+        # Now, you can use sorted_faces_fixed in the rest of your code
+        sorted_faces_z_array = sorted_faces_fixed
+
+        #sorted_faces_z_array = np.array(sorted_faces)
+        tole =1e-4
+        matching_rows = np.where(abs(sorted_faces_z_array[:, 0] - zcord)<tole)
+        for index in matching_rows[0]:
+            face = sorted_faces_z_array[index]
+            coords = [(xyz[face[2][0],1], xyz[face[2][0],2]), (xyz[face[2][1],1], xyz[face[2][1],2]), (xyz[face[2][2],1], xyz[face[2][2],2]), (xyz[face[2][3],1], xyz[face[2][3],2])]
+            polygs = sg.Polygon(coords)
+            try:
+                if len(polygs) > 1:
+                    for geom in polygs:
+                        ext_x, ext_y = geom.exterior.xy
+                        polygon_item = pg.PlotDataItem(ext_x, ext_y, fillLevel=0, brush=QBrush(QColor(65, 105, 225, 100)), pen=pg.mkPen(color=(0, 0, 0, 0), width=2))
+                        self.plot2d.addItem(polygon_item)
+                        self.staticPlotItems.append(polygon_item)
+                        #print('plotting face ', str(face), '- a' )
+            except TypeError:
+                ext_x, ext_y = polygs.exterior.xy
+                polygon_item = pg.PlotDataItem(ext_x, ext_y, fillLevel=0, brush=QBrush(QColor(65, 105, 225, 100)), pen=pg.mkPen(color=(0, 0, 0, 0), width=2))
+                self.plot2d.addItem(polygon_item)
+                self.staticPlotItems.append(polygon_item)
+                #print('plotting face ', str(face), '- b' )
+                if len(polygs.interiors) > 0:
+                    for hole in polygs.interiors:
+                        int_x, int_y = hole.xy
+                        polygon_item = pg.PlotDataItem(int_x, int_y, fillLevel=0, brush=QBrush(QColor(255, 255, 255, 255)), pen=pg.mkPen(color=(0, 0, 0, 0), width=2))
+                        self.plot2d.addItem(polygon_item)
+                        self.staticPlotItems.append(polygon_item)
+                        #print('plotting face ', str(face), '- c' )
+        end_time = time.time()
+        elapsed_time = end_time - start_time
+        print(f"Elapsed time plot_pixel function: {elapsed_time:.2f} seconds (excluding pixel_find)")
+    
     def plot_polylines(self):
         for poly in mct.polys[mct.zcoords[self.combo_slices.currentIndex()]]:
             item = pg.PlotCurveItem(pen=pg.mkPen(color=(0, 0, 255, 255), width=3))
@@ -935,7 +1456,7 @@ class Window(QMainWindow):
                     self.plot2d.addItem(pts)
                     self.staticPlotItems.append(pts)
     
-    def plot_polygs_clean(self):
+    def plot_polygs_clean_old(self):
         # This part must be improved
         polygs = mct.polygs[mct.zcoords[self.combo_slices.currentIndex()]]
 
@@ -957,6 +1478,30 @@ class Window(QMainWindow):
                     polygon_item = pg.PlotDataItem(int_x, int_y, fillLevel=0, brush=QBrush(QColor(255, 255, 255, 255)), pen=pg.mkPen(color=(0, 0, 0, 0), width=2))
                     self.plot2d.addItem(polygon_item)
                     self.staticPlotItems.append(polygon_item)
+    
+    def plot_polygs_clean(self):
+        #
+        polygs = mct.polygs[mct.zcoords[self.combo_slices.currentIndex()]]
+
+        if isinstance(polygs, sg.MultiPolygon):
+            for geom in polygs.geoms:
+                ext_x, ext_y = geom.exterior.xy
+                polygon_item = pg.PlotDataItem(ext_x, ext_y, fillLevel=0, brush=QBrush(QColor(100, 100, 100, 100)), pen=pg.mkPen(color=(0, 0, 0, 0), width=2))
+                self.plot2d.addItem(polygon_item)
+                self.staticPlotItems.append(polygon_item)
+        elif isinstance(polygs, sg.Polygon):
+            ext_x, ext_y = polygs.exterior.xy
+            polygon_item = pg.PlotDataItem(ext_x, ext_y, fillLevel=0, brush=QBrush(QColor(100, 100, 100, 100)), pen=pg.mkPen(color=(0, 0, 0, 0), width=2))
+            self.plot2d.addItem(polygon_item)
+            self.staticPlotItems.append(polygon_item)
+            
+            if polygs.interiors:
+                for hole in polygs.interiors:
+                    int_x, int_y = hole.xy
+                    polygon_item = pg.PlotDataItem(int_x, int_y, fillLevel=0, brush=QBrush(QColor(255, 255, 255, 255)), pen=pg.mkPen(color=(0, 0, 0, 0), width=2))
+                    self.plot2d.addItem(polygon_item)
+                    self.staticPlotItems.append(polygon_item)
+
 
             
 
@@ -965,6 +1510,7 @@ class Window(QMainWindow):
         chk2centr = self.check_2d_centr.isChecked()
         chk2dplines = self.check_2d_polylines.isChecked()
         chk2dplclean = self.check_2d_polylines_clean.isChecked()
+        chk2dpixel = self.check_2d_pixel.isChecked()
         #
         self.plot2d.setTitle('')
         #
@@ -990,6 +1536,8 @@ class Window(QMainWindow):
                 self.plot_slice()
             if chk2centr and mct.ctrds is not None:
                 self.plot_centroids()
+            if chk2dpixel and mct.elconnect is not None:
+                self.plot_pixel()
             # if mct.temp_scatter is not None:
             #     self.plot2d.addItem(mct.temp_scatter)
         except KeyError:
@@ -1255,8 +1803,27 @@ class Window(QMainWindow):
         copydialog.btn_ok.clicked.connect(copy_ok)
         copydialog.exec_()
 
+class StreamToTextEdit:
+    def __init__(self, text_edit, stream, filename):
+        self.text_edit = text_edit
+        self.stream = stream
+        self.log_file = filename
+
+    def write(self, text):
+        self.stream.write(text)
+        self.text_edit.moveCursor(QTextCursor.End)
+        self.text_edit.insertPlainText(text)
+        self.writef(text)
+    
+    def writef(self, text):        
+        with open(self.log_file, 'a') as f:
+            f.write(text)
 
 app = QApplication(sys.argv)
+#
+# Create an instance of the Logger class and redirect stdout
+
+#
 win = Window()
 win.show()
 sys.exit(app.exec_())

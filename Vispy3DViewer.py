@@ -1,7 +1,9 @@
 import numpy as np
-import vispy.app
+# import vispy.app
 import vispy.scene
+from vispy import app, scene
 from vispy.scene import visuals
+import Mesh_functions as mf
 
 class Visp3dplot():
     """ Class that handles all the 3DViewer graphics.
@@ -69,6 +71,26 @@ class Visp3dplot():
                                 face_color=(220 / 255, 30 / 255, 30 / 255, 1), size=2.7)
         self.view3d.add(self.vertices)
 
+    # def print_mesh_1(self, mct):
+
+    #     vertices
+    #     color=(0, 0, 1, 0.5)):
+    #     canvas = scene.SceneCanvas(keys='interactive', bgcolor='white')
+    #     view = canvas.central_widget.add_view()
+    #     view.camera = 'turntable'
+
+    #     # Create vertices and edges
+    #     vertices = np.array(vertices)
+
+    #     # Create a PolygonVisual to represent the filled polygon
+    #     polygon = scene.visuals.Polygon(vertices=vertices, color=color, method='gl', parent=view.scene)
+
+    #     # Show the canvas
+    #     canvas.show()
+
+    #     # Run the app
+    #     if not hasattr(app, 'event_loop') or not app.event_loop.is_running():
+    #         app.run()
 
     def print_mesh(self, mct):  # Metodo provvisiorio
         # mct.nodelist,  row[i] = [nodeID, x, y, z]
@@ -143,8 +165,58 @@ class Visp3dplot():
         self.nodes.set_data(nodes, symbol='square',
                                face_color=(220 / 255, 30 / 255, 30 / 255, 1), size=3.5)
         self.view3d.add(self.nodes)
+        
 
 
+        # SINGOLO POLIGONO FUNZIONA
+        # faceplot = visuals.Polygon(pos=faces[1], color=(1, 1, 1, 1))
+        # self.view3d.add(faceplot)
+
+        # SINGOLO POLIGONO TEST
+        # polyg1 = np.array([[1, 0, 0], [2, 0, 0], [3, 4, 0], [1, 4, 0]])
+        # plotpolyg = visuals.Polygon(pos=polyg1, color=(1, 1, 1, 1))
+        # view.add(plotpolyg)
+
+    def print_mesh2(self, mct):  # Metodo provvisiorio
+        # mct.nodelist,  row[i] = [nodeID, x, y, z]
+        # mct.elconnect, row[i] = [edelmID, nID1, nID2, nID3, nID4, nID5, nID6, nID7, nID8]
+        vxyz = mct.nodelist
+        xyz = vxyz[:,1:4]
+        LCOf = mct.elconnect
+        csize = LCOf.shape[1]
+        LCO = LCOf[:,1:csize].astype(int)
+        boundary_faces = mf.find_external_faces(LCO)
+
+        # Create a scatter plot of the points
+        scatter = scene.visuals.Markers()
+        scatter.set_data(xyz, edge_color=None, face_color=(1, 1, 1, 1), size=5)
+        self.view3d.add(scatter)
+        
+        # Create polygons for the faces
+        for face_indices in boundary_faces:
+            face_indices_minus_1 = list([index - 1 for index in face_indices])
+            try:
+                vertices1 = xyz[face_indices_minus_1,:]
+                polygon = scene.visuals.Polygon(vertices=vertices1, faces=face_indices_minus_1, color=(0.2, 0.4, 0.6, 0.7))
+                self.view3d.add(polygon)
+                # Create Line visuals for the edges of the rectangle
+                edges = np.array([[0, 1], [1, 2], [2, 3], [3, 0]], dtype=np.uint32)
+                rectangle_edges = scene.visuals.Line(vertices=vertices[edges], color='black')
+                self.view3d.add(rectangle_edges)
+                print(face_indices, ' plotted!')
+            except:
+                try:
+                    vertices = xyz[list(reversed(face_indices_minus_1)),:]
+                    polygon = scene.visuals.Polygon(pos=vertices, color=(0.2, 0.4, 0.6, 0.7))
+                    self.view3d.add(polygon)
+                    rectangle_edges = scene.visuals.Line(vertices=np.vstack((vertices, vertices[0])), color='black')
+                    self.view3d.add(rectangle_edges)
+                    print(face_indices, ' plotted!')
+                    # print(max(face_indices_minus_1))
+                except:
+                    continue
+        
+        self.view3d.camera.set_range()
 
         # SINGOLO POLIGONO FUNZIONA
         # faceplot = visuals.Polygon(pos=faces[1], color=(1, 1, 1, 1))

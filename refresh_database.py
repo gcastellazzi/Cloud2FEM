@@ -31,4 +31,7 @@ def refresh_database(global_mct):
     global_mct.roiIndex=None
     global_mct.minwthick = None
     global_mct.slice_thick = None
+    global_mct.sorted_faces = None
+    global_mct.sorted_faces_x = None
+    global_mct.sorted_faces_y = None
     return global_mct
