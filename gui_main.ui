@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>1073</width>
-    <height>995</height>
+    <width>932</width>
+    <height>890</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -2243,7 +2243,7 @@
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>1073</width>
+     <width>932</width>
      <height>24</height>
     </rect>
    </property>
@@ -2290,6 +2290,9 @@
    </property>
    <property name="text">
     <string>Point Cloud...</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+I</string>
    </property>
   </action>
   <action name="exp_dxf">

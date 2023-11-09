@@ -36,6 +36,10 @@ import os
 import subprocess
 import time
 from datetime import datetime
+from sys import platform
+from pathlib import Path
+#import tkinter as tk
+from screeninfo import get_monitors
 # from mayavi import mlab
 
 
@@ -76,7 +80,7 @@ class MainContainer:
                  polygs=None, xngrid=None, xelgrid=None, yngrid=None, yelgrid=None,
                  elemlist=None, nodelist=None, elconnect=None, temp_points=None,
                  temp_scatter=None, temp_polylines=None, temp_roi_plot=None,
-                 editmode=None, roiIndex=None, sorted_faces=None, sorted_faces_x=None, sorted_faces_y=None):
+                 editmode=None, roiIndex=None, sorted_faces=None, sorted_faces_x=None, sorted_faces_y=None, filepath_cloud=None):
         self.filepath = filepath
         self.pcl = pcl              # Whole PCl as a 3-columns xyz numpy array
         self.npts = npts            # the above 'pcl' number of points
@@ -105,6 +109,7 @@ class MainContainer:
         self.sorted_faces = sorted_faces # databse of voxel faces (internal faces)
         self.sorted_faces_x = sorted_faces_x # databse of x voxel faces (internal faces)
         self.sorted_faces_y = sorted_faces_y # databse of y voxel faces (internal faces)
+        self.filepath_cloud = filepath_cloud
         #
 
 
@@ -151,18 +156,26 @@ def save_project_pysos():
     
 def save_project():
     try:
-        #fd = QFileDialog()
-        filepath = mct.filepath 
-        #fd.getSaveFileName(parent=None, caption="Save Project", directory="",
-        #                              filter="Cloud2FEM Data (*.cloud2fem)")[0]
         #
-        with open(filepath, 'wb') as handle:
-            pickle.dump(mct, handle, protocol=pickle.HIGHEST_PROTOCOL)
-            mct_dict = mct.__dict__  # Special method: convert instance of a class to a dict
+        filepath = mct.filepath
+        if filepath :
+            with open(filepath, 'wb') as handle:
+                pickle.dump(mct, handle, protocol=pickle.HIGHEST_PROTOCOL)
+                mct_dict = mct.__dict__  # Special method: convert instance of a class to a dict
             #
+            print('Closing handling file: file saved')
+            handle.close()
+        else:
+            fd = QFileDialog()
+            filepath = fd.getSaveFileName(parent=None, caption="Save Project", directory="",
+                                      filter="Cloud2FEM Data (*.cloud2fem)")[0]
+            with open(filepath, 'wb') as handle:
+                pickle.dump(mct, handle, protocol=pickle.HIGHEST_PROTOCOL)
+                mct_dict = mct.__dict__  # Special method: convert instance of a class to a dict
+            #
+            print('Closing handling file: file correctly saved')
+            handle.close()
         #
-        print('Closing handling file')
-        handle.close()
     except (ValueError, TypeError, FileNotFoundError):
         print('No file name specified')
 
@@ -261,136 +274,151 @@ def open_file_in_app(self):
     #     subprocess.Popen(['open', '-t', self.filename])
 
 def open_project():
-        try:
-            fd = QFileDialog()
-            #
-            filepath = fd.getOpenFileName(parent=None, caption="Open Project", directory="",
-                                         filter="Cloud2FEM Data (*.cloud2fem);;Old Cloud2FEM Data MacOsx (*.cloud2fem.db);;Old Cloud2FEM Windows Data (*.cloud2fem.dat)")[0]
-            if "cloud2fem.db" in filepath or "cloud2fem.dat" in filepath:
-                s = shelve.open(filepath[: -4])
-                mct.npts = s['npts']
-                mct.zmin = s['zmin']
-                mct.zmax = s['zmax']
-                mct.xmin = s['xmin']
-                mct.xmax = s['xmax']
-                mct.ymin = s['ymin']
-                mct.ymax = s['ymax']
-                try:
-                    mct.zcoords = s['zcoords']
-                except KeyError:
-                    mct.zcoords = s['zslices']
-                mct.slices = s['slices']
-                mct.ctrds = s['ctrds']
-                mct.polys = s['polys']
-                mct.cleanpolys = s['cleanpolys']
-                mct.polygs = s['polygs']
-                mct.xngrid = s['xngrid']
-                mct.xelgrid = s['xelgrid']
-                mct.yngrid = s['yngrid']
-                mct.yelgrid = s['yelgrid']
-                mct.elemlist = s['elemlist']
-                mct.nodelist = s['nodelist']
-                mct.elconnect = s['elconnect']
-                s.close()
-            else:
+    try:
+        fd = QFileDialog()
+        #
+        filepath = fd.getOpenFileName(parent=None, caption="Open Project", directory="",
+                                        filter="Cloud2FEM Data (*.cloud2fem);;Old Cloud2FEM Data MacOsx (*.cloud2fem.db);;Old Cloud2FEM Windows Data (*.cloud2fem.dat)")[0]
+        if filepath:
+            try:
+                if "cloud2fem.db" in filepath or "cloud2fem.dat" in filepath:
+                    s = shelve.open(filepath[: -4])
+                    mct.npts = s['npts']
+                    mct.zmin = s['zmin']
+                    mct.zmax = s['zmax']
+                    mct.xmin = s['xmin']
+                    mct.xmax = s['xmax']
+                    mct.ymin = s['ymin']
+                    mct.ymax = s['ymax']
+                    try:
+                        mct.zcoords = s['zcoords']
+                    except KeyError:
+                        mct.zcoords = s['zslices']
+                    mct.slices = s['slices']
+                    mct.ctrds = s['ctrds']
+                    mct.polys = s['polys']
+                    mct.cleanpolys = s['cleanpolys']
+                    mct.polygs = s['polygs']
+                    mct.xngrid = s['xngrid']
+                    mct.xelgrid = s['xelgrid']
+                    mct.yngrid = s['yngrid']
+                    mct.yelgrid = s['yelgrid']
+                    mct.elemlist = s['elemlist']
+                    mct.nodelist = s['nodelist']
+                    mct.elconnect = s['elconnect']
+                    s.close()
+                else:
+                    #
+                    with open(filepath, "rb") as f:
+                        s = pickle.load(f)
+                    #
+                    mct.filepath =  s.filepath
+                    mct.pcl = s.pcl
+                    mct.netpcl = s.netpcl
+                    #G
+                    mct.npts = s.npts
+                    mct.zmin = s.zmin
+                    mct.zmax = s.zmax
+                    mct.xmin = s.xmin
+                    mct.xmax = s.xmax
+                    mct.ymin = s.ymin
+                    mct.ymax = s.ymax
+                    try:
+                        mct.zcoords = s.zcoords
+                    except KeyError:
+                        mct.zcoords = s.zslices
+                    mct.slices = s.slices
+                    mct.ctrds = s.ctrds
+                    mct.polys = s.polys
+                    mct.cleanpolys = s.cleanpolys
+                    mct.polygs = s.polygs
+                    mct.xngrid = s.xngrid
+                    mct.xelgrid = s.xelgrid
+                    mct.yngrid = s.yngrid
+                    mct.yelgrid = s.yelgrid
+                    mct.elemlist = s.elemlist
+                    mct.nodelist = s.nodelist
+                    mct.elconnect = s.elconnect
+                    #mct.sorted_faces = s.sorted_faces
+                    # Check if the attribute 'minwthick' exists before accessing it
+                    if hasattr(s, 'minwthick'):
+                        mct.minwthick = s.minwthick
+                    else:
+                        mct.minwthick = '0.0'
+                    # Check if the attribute 'sorted_faces' exists before accessing it
+                    if hasattr(s, 'sorted_faces'):
+                        mct.sorted_faces = s.sorted_faces
+                    else:
+                        mct.sorted_faces = None
+                    if hasattr(s, 'sorted_faces_x'):
+                        mct.sorted_faces_x = s.sorted_faces_x
+                    else:
+                        mct.sorted_faces_x = None
+                    if hasattr(s, 'sorted_faces_y'):
+                        mct.sorted_faces_y = s.sorted_faces_y
+                    else:
+                        mct.sorted_faces_y = None
+                    mct.clicked_x = None
+                    mct.clicked = None
+                    f.close()
+                win.combo_slices.clear()
+                for z in mct.zcoords:
+                    win.combo_slices.addItem(str('%.3f' % z))
+                win.main2dplot()
+
+                win.label_zmin_value.setText(str(mct.zmin))
+                win.label_zmax_value.setText(str(mct.zmax))
                 #
-                with open(filepath, "rb") as f:
-                    s = pickle.load(f)
+                win.lineEdit_from.setText(str(mct.zcoords[0])) 
+                win.lineEdit_to.setText(str(mct.zcoords[-1])) 
+                tentative_number_of_slices = len(mct.zcoords)
+                win.lineEdit_steporN.setText(str(tentative_number_of_slices))
+                tentative_slice_thickness = mct.slice_thick
+                win.lineEdit_thick.setText(str(tentative_slice_thickness))
+                print('Warning: the limits for slicing the cloud are tentatively set using the following parameters:')
+                print(f'Z min = {round(mct.zmin)}')
+                print(f'Z max = {round(mct.zmax)}')
+                print('Slicing approach: Fixed number of slices')
+                print(f'Tentative number of slices N = {tentative_number_of_slices}')
+                print(f'Slice thickness = {tentative_slice_thickness}')
                 #
-                mct.filepath =  s.filepath
-                mct.pcl = s.pcl
-                mct.netpcl = s.netpcl
-                #G
-                mct.npts = s.npts
-                mct.zmin = s.zmin
-                mct.zmax = s.zmax
-                mct.xmin = s.xmin
-                mct.xmax = s.xmax
-                mct.ymin = s.ymin
-                mct.ymax = s.ymax
-                try:
-                    mct.zcoords = s.zcoords
-                except KeyError:
-                    mct.zcoords = s.zslices
-                mct.slices = s.slices
-                mct.ctrds = s.ctrds
-                mct.polys = s.polys
-                mct.cleanpolys = s.cleanpolys
-                mct.polygs = s.polygs
-                mct.xngrid = s.xngrid
-                mct.xelgrid = s.xelgrid
-                mct.yngrid = s.yngrid
-                mct.yelgrid = s.yelgrid
-                mct.elemlist = s.elemlist
-                mct.nodelist = s.nodelist
-                mct.elconnect = s.elconnect
-                #mct.sorted_faces = s.sorted_faces
-                # Check if the attribute 'minwthick' exists before accessing it
-                if hasattr(s, 'minwthick'):
-                    mct.minwthick = s.minwthick
-                else:
-                    mct.minwthick = '0.0'
-                # Check if the attribute 'sorted_faces' exists before accessing it
-                if hasattr(s, 'sorted_faces'):
-                    mct.sorted_faces = s.sorted_faces
-                else:
-                    mct.sorted_faces = None
-                if hasattr(s, 'sorted_faces_x'):
-                    mct.sorted_faces_x = s.sorted_faces_x
-                else:
-                    mct.sorted_faces_x = None
-                if hasattr(s, 'sorted_faces_y'):
-                    mct.sorted_faces_y = s.sorted_faces_y
-                else:
-                    mct.sorted_faces_y = None
-                mct.clicked_x = None
-                mct.clicked = None
-                f.close()
+                win.lineEdit_wall_thick.setText(str(mct.minwthick))
+                win.lineEdit_thick.setText(str(mct.slice_thick))
+                win.btn_3dview.setEnabled(True)
+                win.check_pcl_slices.setEnabled(True)
+                win.status_slices.setStyleSheet("background-color: rgb(0, 255, 0);")
+                win.btn_gen_centr.setEnabled(True)
+                win.lineEdit_wall_thick.setEnabled(True)
+                win.lineEdit_xeldim.setEnabled(True)
+                win.lineEdit_yeldim.setEnabled(True)
+                win.check_pcl.setChecked(True)
+                win.check_pcl.setEnabled(True)
+                win.btn_edit.setEnabled(True)
 
-            win.combo_slices.clear()
-            for z in mct.zcoords:
-                win.combo_slices.addItem(str('%.3f' % z))
-            win.main2dplot()
-
-            win.label_zmin_value.setText(str(mct.zmin))
-            win.label_zmax_value.setText(str(mct.zmax))
-            win.lineEdit_wall_thick.setText(str(mct.minwthick))
-            win.lineEdit_from.setText(str(mct.zcoords[0])) 
-            win.lineEdit_to.setText(str(mct.zcoords[-1])) 
-            win.lineEdit_steporN.setText(str(len(mct.zcoords))) 
-            win.lineEdit_thick.setText(str(mct.slice_thick))
-            win.btn_3dview.setEnabled(True)
-            win.check_pcl_slices.setEnabled(True)
-            win.status_slices.setStyleSheet("background-color: rgb(0, 255, 0);")
-            win.btn_gen_centr.setEnabled(True)
-            win.lineEdit_wall_thick.setEnabled(True)
-            win.lineEdit_xeldim.setEnabled(True)
-            win.lineEdit_yeldim.setEnabled(True)
-            win.check_pcl.setChecked(True)
-            win.check_pcl.setEnabled(True)
-            win.btn_edit.setEnabled(True)
-
-            if mct.ctrds != None:
-                win.check_centroids.setEnabled(True)
-                win.status_centroids.setStyleSheet("background-color: rgb(0, 255, 0);")
-                win.btn_gen_polylines.setEnabled(True)
-                win.radioCentroids.setEnabled(True)
-            if mct.cleanpolys != None:
-                win.check_polylines.setEnabled(True)
-                win.status_polylines.setStyleSheet("background-color: rgb(0, 255, 0);")
-                win.btn_gen_polygons.setEnabled(True)
-                win.radioPolylines.setEnabled(True)
-                win.btn_copy_plines.setEnabled(True)
-            if mct.polygs != None:
-                win.status_polygons.setStyleSheet("background-color: rgb(0, 255, 0);")
-                win.btn_gen_mesh.setEnabled(True)
-                win.exp_dxf.setEnabled(True)
-            if mct.elemlist != None:
-                win.status_mesh.setStyleSheet("background-color: rgb(0, 255, 0);")
-                win.exp_mesh.setEnabled(True)
-
-        except ValueError:
-            print('No project file selected')
+                if mct.ctrds != None:
+                    win.check_centroids.setEnabled(True)
+                    win.status_centroids.setStyleSheet("background-color: rgb(0, 255, 0);")
+                    win.btn_gen_polylines.setEnabled(True)
+                    win.radioCentroids.setEnabled(True)
+                if mct.cleanpolys != None:
+                    win.check_polylines.setEnabled(True)
+                    win.status_polylines.setStyleSheet("background-color: rgb(0, 255, 0);")
+                    win.btn_gen_polygons.setEnabled(True)
+                    win.radioPolylines.setEnabled(True)
+                    win.btn_copy_plines.setEnabled(True)
+                if mct.polygs != None:
+                    win.status_polygons.setStyleSheet("background-color: rgb(0, 255, 0);")
+                    win.btn_gen_mesh.setEnabled(True)
+                    win.exp_dxf.setEnabled(True)
+                if mct.elemlist != None:
+                    win.status_mesh.setStyleSheet("background-color: rgb(0, 255, 0);")
+                    win.exp_mesh.setEnabled(True)
+            except FileNotFoundError:
+                print(f"File not found: {filepath}")
+        else:
+            print("File dialog was canceled or escaped.")
+    except ValueError:
+        print('No project file selected')
 
 
 
@@ -402,8 +430,8 @@ def loadpcl():
         fd = QFileDialog()
         getfile = fd.getOpenFileName(parent=None, caption="Load Point Cloud", directory="",
                                      filter="Point Cloud Data (*.pcd);; Polygon File Format (*.ply)")
-        mct.filepath = getfile[0]
-        wholepcl = PyntCloud.from_file(mct.filepath)
+        mct.filepath_cloud = getfile[0]
+        wholepcl = PyntCloud.from_file(mct.filepath_cloud)
         mct.npts = wholepcl.points.shape[0]          # Point Cloud number of points
 
         # Defines a 3-columns xyz numpy array
@@ -420,15 +448,29 @@ def loadpcl():
         mct.xmax = mct.pcl[:, 0].max()
         mct.ymin = mct.pcl[:, 1].min()
         mct.ymax = mct.pcl[:, 1].max()
-        print("\nPoint Cloud of " + str(mct.pcl.shape[0]) + " points loaded, file path: " + mct.filepath)
+        print("\nPoint Cloud of " + str(mct.pcl.shape[0]) + " points loaded, file path: " + mct.filepath_cloud)
         print("First three points:\n" + str(mct.pcl[:3]))
         print("Last three points:\n" + str(mct.pcl[-3:]))
-        if len(mct.filepath) < 65:
-            win.loaded_file.setText("Loaded Point Cloud: " + mct.filepath + "   ")
+        #
+        win.lineEdit_from.setText(str(round(mct.zmin)))
+        win.lineEdit_to.setText(str(round(mct.zmax)))
+        tentative_number_of_slices = 6
+        win.lineEdit_steporN.setText(str(tentative_number_of_slices))
+        tentative_slice_thickness = abs(round(mct.zmax)-round(mct.zmin))/100
+        win.lineEdit_thick.setText(str(tentative_slice_thickness))
+        print('Warning: the limits for slicing the cloud are tentatively set using the following parameters:')
+        print(f'Z min = {round(mct.zmin)}')
+        print(f'Z max = {round(mct.zmax)}')
+        print('Slicing approach: Fixed number of slices')
+        print(f'Tentative number of slices N = {tentative_number_of_slices}')
+        print(f'Slice thickness = {tentative_slice_thickness}')
+        #
+        if len(mct.filepath_cloud) < 65:
+            win.loaded_file.setText("Loaded Point Cloud: " + mct.filepath_cloud + "   ")
         else:
             slashfound = 0
             head_reverse = ''
-            for char in mct.filepath[:30][::-1]:
+            for char in mct.filepath_cloud[:30][::-1]:
                 if char == '/' and slashfound == 0:
                     slashfound += 1
                 elif slashfound == 0:
@@ -439,7 +481,7 @@ def loadpcl():
 
             slashfound = 0
             path_tail = ''
-            for char in mct.filepath[30:]:
+            for char in mct.filepath_cloud[30:]:
                 if char == '/' and slashfound == 0:
                     slashfound += 1
                 elif slashfound == 0:
@@ -534,8 +576,17 @@ class Window(QMainWindow):
         self.plot2d.setTitle('')
         # self.plot2d.enableAutoRange(enable=False)  # Da sistemare, mantiene gli assi bloccati quando aggiorno il plot?
         #
+        # Checking if tem folder is present
+        home_folder = Path.home()
+        temp_folder_path = os.path.join(home_folder, "Cloud2FEM_temp_files" )
+        temp_folder_exist = os.path.isdir(temp_folder_path)
+        if not temp_folder_exist:
+            os.makedirs(temp_folder_path) 
+
+        
         Time_now = datetime.now().strftime("%Y_%m_%d-%I_%M_%S_%p")
-        self.filename = ('debug_log_' + Time_now + '.txt')
+        temp_filename = 'debug_log_' + Time_now + '.txt'
+        self.filename = os.path.join(temp_folder_path, temp_filename )
         # Redirect stdout and stderr to QTextEdit
         sys.stdout = StreamToTextEdit(self.plainText_terminal, sys.stdout, self.filename)
         sys.stderr = StreamToTextEdit(self.plainText_terminal, sys.stderr, self.filename)
@@ -616,11 +667,16 @@ class Window(QMainWindow):
         #
         # manual version
         self.btn_plot_xy_section_manual.clicked.connect(self.plot_pixel_xy_m)
-        self.figure_on = False
+        self.figure_section = None
+        self.axes_section = None
 
         # TEST plot poligoni #################################
         self.pushtest.clicked.connect(test_plotpolygons)
         ######################################################
+        print('##########################################################################')
+        print('Console and error messages are saved in the logfile, which is located at:')
+        print( self.filename)
+        print('##########################################################################')
     
     def plot_mesh(self):
         xyz = mct.nodelist
@@ -919,10 +975,22 @@ class Window(QMainWindow):
         self.plot2d.vb.enableAutoRange()
         mct.minwthick = float(self.lineEdit_wall_thick.text())
         # Convert Shapely coordinates to a numpy array
-        ctrds_np = np.array([list(geom.coords) for geom in mct.ctrds])
+        try:
+            ctrds_np = np.array([list(geom.coords) for geom in mct.ctrds])
+        except:
+            coordinates_list = []
+            for key, value in mct.ctrds.items():
+                # Access the coordinates from the NumPy array
+                coords = value[0]  # Assuming each value is a 2D array of coordinates
+                coordinates_list.append(coords)
 
-        mct.polys, mct.cleanpolys = cp.make_polylines(mct.minwthick, mct.zcoords, ctrds_np)
+            # Convert the list of coordinates to a NumPy array
+            ctrds_np = np.array(coordinates_list)
 
+        try:
+            mct.polys, mct.cleanpolys = cp.make_polylines(mct.minwthick, mct.zcoords, ctrds_np)
+        except:
+            mct.polys, mct.cleanpolys = cp.make_polylines(mct.minwthick, mct.zcoords, mct.ctrds)
         #mct.polys, mct.cleanpolys = cp.make_polylines(mct.minwthick, mct.zcoords, mct.ctrds)
         
         self.check_polylines.setEnabled(True)
@@ -1144,12 +1212,13 @@ class Window(QMainWindow):
     def get_pixel_xy(self):
         #
         self.plot2d.setTitle("<span style=\"color:black;font-size:12pt\">Mouse Left Click: select section location (x,y)</span><BR><span style=\"color:red;font-size:12pt\">Mouse Right Click: stop selection</span>")
-        if self.signal_connected:
-            try: self.click_handler.stop()  # Disconnect the signal if it was previously connected
-            except Exception: 
-                pass
-                self.connected = False
-            
+        # DA COMMENTARE? inizio
+        # if self.signal_connected:
+        #     try: self.click_handler.stop()  # Disconnect the signal if it was previously connected
+        #     except Exception: 
+        #         pass
+        #         self.connected = False
+        # DA COMMENTARE? fine
 
         self.click_handler.start()
         loop = QEventLoop()
@@ -1160,7 +1229,32 @@ class Window(QMainWindow):
     def plot_pixel_xy(self, xcoord, ycoord):
         if self.clicked_point is not None:
             print('self.clicked_point is defined')
-    
+
+    # Function to create the figure and subplots
+    def create_figure_section(self):
+        # Check if fig is None (first time)
+        if self.figure_section is None or not plt.fignum_exists(self.figure_section.number):
+            # Get the screen size
+            # Get the screen dimensions
+            screen_info = get_monitors()
+            screen_width = screen_info[0].width
+            screen_height = screen_info[0].height
+
+            # Calculate the dimensions for the new figure (one quarter of the screen size)
+            figure_width = screen_width / 2
+            figure_height = screen_height / 2
+            int_figure_width = int(figure_width)
+            int_figure_height = int(figure_height)  
+
+            # Create a new figure with the specified dimensions and position
+            self.figure_section = plt.figure(figsize=(int_figure_width, int_figure_height))
+            manager = plt.get_current_fig_manager()
+            manager.window.setGeometry(0, 0, int_figure_width, int_figure_height)
+            # Add two subplots side by side
+            self.axes_section = self.figure_section.subplots(1, 2)
+        return self.figure_section, self.axes_section
+
+
     def plot_pixel_xy_m(self):
         if self.signal_connected:
             xcoord = self.clicked_x
@@ -1222,9 +1316,12 @@ class Window(QMainWindow):
         
         start_time = time.time()
         # Create a figure with two subplots
-        plt.close('all')
-        fig, axes = plt.subplots(1, 2, figsize=(10, 5))
-        self.figure_on = True
+        self.figure_section, self.axes_section = self.create_figure_section()
+        # Clear the existing plots on the subplots (optional)
+        #plt.clf()
+        for ax in self.figure_section.axes:
+            ax.cla()
+
         for index in matching_rows_x:
             face = sorted_faces_x_array[index]
 
@@ -1234,9 +1331,9 @@ class Window(QMainWindow):
                     (xyz[face[2][3], 2], xyz[face[2][3], 3])]
             #
             # Plot rectangles with green filling on the left subplot
-            axes[0].set_aspect('equal')
+            self.figure_section.axes[0].set_aspect('equal')
             polygon = Polygon(coords, closed=True, facecolor='green', edgecolor='black',  alpha=0.3)
-            axes[0].add_patch(polygon)
+            self.figure_section.axes[0].add_patch(polygon)
         margin_tolerance = 0.05*self.abs_max_y
         if abs(self.abs_min_y) < margin_tolerance:
             self.abs_min_y = - margin_tolerance
@@ -1249,12 +1346,12 @@ class Window(QMainWindow):
             coeffm = .95
         else:
             coeffm = 1.05
-        axes[0].hlines(y=mct.zcoords[self.combo_slices.currentIndex()], xmin=coeff*self.abs_min_y, xmax=coeffm*self.abs_max_y, colors='k', linewidth=3)  # Horizontal line
-        axes[0].vlines(x=ycoord, ymin=0.5*min(mct.zcoords[:]), ymax=1.5*max(mct.zcoords[:]), colors='r', linewidth=3)  # Vertical line
-        axes[0].set_title('X section ')        
-        axes[0].set_xlim(coeff*self.abs_min_y, coeffm*self.abs_max_y)
-        axes[0].set_ylim(0.95*min(mct.zcoords[:]), 1.3*max(mct.zcoords[:]))
-        axes[0].set_aspect('equal', 'box')
+        self.figure_section.axes[0].hlines(y=mct.zcoords[self.combo_slices.currentIndex()], xmin=coeff*self.abs_min_y, xmax=coeffm*self.abs_max_y, colors='k', linewidth=3)  # Horizontal line
+        self.figure_section.axes[0].vlines(x=ycoord, ymin=0.5*min(mct.zcoords[:]), ymax=1.5*max(mct.zcoords[:]), colors='r', linewidth=3)  # Vertical line
+        self.figure_section.axes[0].set_title('X section ')        
+        self.figure_section.axes[0].set_xlim(coeff*self.abs_min_y, coeffm*self.abs_max_y)
+        self.figure_section.axes[0].set_ylim(0.95*min(mct.zcoords[:]), 1.3*max(mct.zcoords[:]))
+        self.figure_section.axes[0].set_aspect('equal', 'box')
         #
         for index in matching_rows_y:
             face = sorted_faces_y_array[index]
@@ -1265,9 +1362,9 @@ class Window(QMainWindow):
                     (xyz[face[2][3], 1], xyz[face[2][3], 3])]
 
             # Plot rectangles with red filling on the right subplot
-            axes[1].set_aspect('equal')
+            self.figure_section.axes[1].set_aspect('equal')
             polygon = Polygon(coords, closed=True, facecolor='red', edgecolor='black',  alpha=0.3)
-            axes[1].add_patch(polygon)
+            self.figure_section.axes[1].add_patch(polygon)
 
         margin_tolerance = 0.05*self.abs_max_x
         if abs(self.abs_min_x) < margin_tolerance:
@@ -1282,14 +1379,14 @@ class Window(QMainWindow):
         else:
             coeffm = 1.05
         
-        axes[1].hlines(y=mct.zcoords[self.combo_slices.currentIndex()], xmin=coeff*self.abs_min_x, xmax= coeffm*self.abs_max_x, colors='k', linewidth=3)  # Horizontal line
-        axes[1].vlines(x=xcoord, ymin=0.5*min(mct.zcoords[:]), ymax=1.5*max(mct.zcoords[:]), colors='g', linewidth=3)  # Vertical line
-        axes[1].set_title('Y Section')
-        axes[1].set_xlim(coeff*self.abs_min_x, coeffm*self.abs_max_x)
-        axes[1].set_ylim(0.95*min(mct.zcoords[:]), 1.3*max(mct.zcoords[:]))
-        axes[1].set_aspect('equal', 'box')
+        self.figure_section.axes[1].hlines(y=mct.zcoords[self.combo_slices.currentIndex()], xmin=coeff*self.abs_min_x, xmax= coeffm*self.abs_max_x, colors='k', linewidth=3)  # Horizontal line
+        self.figure_section.axes[1].vlines(x=xcoord, ymin=0.5*min(mct.zcoords[:]), ymax=1.5*max(mct.zcoords[:]), colors='g', linewidth=3)  # Vertical line
+        self.figure_section.axes[1].set_title('Y Section')
+        self.figure_section.axes[1].set_xlim(coeff*self.abs_min_x, coeffm*self.abs_max_x)
+        self.figure_section.axes[1].set_ylim(0.95*min(mct.zcoords[:]), 1.3*max(mct.zcoords[:]))
+        self.figure_section.axes[1].set_aspect('equal', 'box')
 
-        plt.tight_layout()  # Adjust spacing between subplots
+        #plt.tight_layout()  # Adjust spacing between subplots
         plt.show()
 
         end_time = time.time()

@@ -1,6 +1,7 @@
 
 def refresh_database(global_mct):
-    global_mct.filepath=None  
+    global_mct.filepath=None 
+    global_mct.filepath_cloud=None  
     global_mct.pcl=None  
     global_mct.npts=None  
     global_mct.zmin=None  
