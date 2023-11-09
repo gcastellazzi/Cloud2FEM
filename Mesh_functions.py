@@ -93,7 +93,7 @@ def find_pixel_xy(LCO, xyz, xy_coords_pairs):
     return sorted_faces_x, sorted_faces_y
 
 
-def find_internal_faces(LCO_matrix, xyz):
+def find_internal_faces(LCO_matrix):
     try:
         if LCO_matrix.shape[0] < 2:
             raise ValueError("At least two elements are required in the LCO matrix.")

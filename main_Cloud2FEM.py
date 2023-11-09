@@ -721,13 +721,61 @@ class Window(QMainWindow):
        # Plot the boundary_faces
         for face in boundary_faces:
             poly3d = [xyz[i-1,1:4] for i in face]
-            ax.add_collection3d(Poly3DCollection([poly3d], facecolors='gray', linewidths=1, edgecolors='k', alpha=0.5))
+            ax.add_collection3d(Poly3DCollection([poly3d], facecolors='gray', linewidths=1, edgecolors='k', alpha=1.0))
+
+        # Extract the coordinates from the xyz array
+        data = boundary_faces
+
+        # Convert the set of tuples into a flat list
+        flat_list = [item for sublist in data for item in sublist]
+
+        # Find unique values in the flat list
+        unique_values = set(flat_list)
+
+        # If you want the unique values as a list, you can convert the set back to a list
+        unique_values_list = list(unique_values)
+        # Subtract 1 from every value in unique_values_list
+        unique_values_list = [value - 1 for value in unique_values_list]
 
 
+        x_values = xyz[unique_values_list, 1]
+        y_values = xyz[unique_values_list, 2]
+        z_values = xyz[unique_values_list, 3]
+
+        # Calculate the min and max values for each axis
+        x_min = np.min(x_values)
+        x_max = np.max(x_values)
+        # Find the index of the maximum value
+        max_index = np.argmax(x_values)
+        value_to_find = max_index
+
+        # Find the groups of values containing the specified value
+        matching_groups = [group for group in boundary_faces if value_to_find in group]
+
+        y_min = np.min(y_values)
+        y_max = np.max(y_values)
+
+        z_min = np.min(z_values)
+        z_max = np.max(z_values)
         # Set axis labels
         ax.set_xlabel('X')
         ax.set_ylabel('Y')
         ax.set_zlabel('Z')
+        # Set the limits using the extracted values
+        ax.set_xlim(x_min, x_max)
+        ax.set_ylim(y_min, y_max)
+        ax.set_zlim(z_min, z_max)
+        # ax.set_xlim(0, 6)
+        # ax.set_ylim(0, 6)
+        # ax.set_zlim(0, 12)
+        # Set the camera position and target to have the full picture
+        ax.view_init(elev=20, azim=30)  # You can adjust the elevation (elev) and azimuth (azim) angles
+
+        # Automatically set the limits based on data
+        ax.autoscale_view()
+
+        # Set equal aspect ratio for all axes
+        ax.set_box_aspect([1, 1, 1])
         plt.show()
 
 
